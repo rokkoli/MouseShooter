@@ -385,7 +385,7 @@ fun GameOverScreen(state: GameState, onRestart: () -> Unit) {
 
 // ─── Hauptmenü ────────────────────────────────────────────────────────────────
 @Composable
-fun MainMenu(onStart: () -> Unit) {
+fun MainMenu(onStartSingleplayer: () -> Unit, onStartMultiplayer: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -437,13 +437,28 @@ fun MainMenu(onStart: () -> Unit) {
             }
             Spacer(Modifier.height(32.dp))
 
-            Button(
-                onClick = onStart,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00AAFF)),
-                modifier = Modifier.width(200.dp).height(52.dp),
-                shape = RoundedCornerShape(26.dp)
-            ) {
-                Text("SPIELEN", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 3.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Button(
+                    onClick = onStartSingleplayer,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00AAFF)),
+                    modifier = Modifier.height(52.dp),
+                    shape = RoundedCornerShape(26.dp)
+                ) {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("SINGLEPLAYER", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                }
+
+                Button(
+                    onClick = onStartMultiplayer,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3366)),
+                    modifier = Modifier.height(52.dp),
+                    shape = RoundedCornerShape(26.dp)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("MULTIPLAYER", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                }
             }
         }
     }

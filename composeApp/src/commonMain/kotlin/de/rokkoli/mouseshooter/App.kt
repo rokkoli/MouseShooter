@@ -12,29 +12,41 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.atan2
 
 // ─── Spielbildschirme ─────────────────────────────────────────────────────────
 enum class Screen { MENU, GAME }
+enum class GameMode { SINGLEPLAYER, MULTIPLAYER }
 
 // ─── Haupt-App ────────────────────────────────────────────────────────────────
 @Composable
 fun App() {
     var screen by remember { mutableStateOf(Screen.MENU) }
+    var gameMode by remember { mutableStateOf(GameMode.SINGLEPLAYER) }
+
     when (screen) {
-        Screen.MENU -> MainMenu(onStart = { screen = Screen.GAME })
-        Screen.GAME -> GameScreen(onRestart = { screen = Screen.MENU })
+        Screen.MENU -> MainMenu(
+            onStartSingleplayer = { gameMode = GameMode.SINGLEPLAYER; screen = Screen.GAME },
+            onStartMultiplayer = { gameMode = GameMode.MULTIPLAYER; screen = Screen.GAME }
+        )
+        Screen.GAME -> GameScreen(mode = gameMode, onRestart = { screen = Screen.MENU })
     }
 }
 
 // ─── Spielbildschirm ──────────────────────────────────────────────────────────
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun GameScreen(onRestart: () -> Unit) {
+fun GameScreen(mode: GameMode, onRestart: () -> Unit) {
     var gameState   by remember { mutableStateOf(createInitialState()) }
     var mousePos    by remember { mutableStateOf(Vec2(400f, 300f)) }
     var isRightDown by remember { mutableStateOf(false) }
@@ -177,7 +189,16 @@ fun GameScreen(onRestart: () -> Unit) {
             }
         }
 
-        // ── Game-Over ─────────────────────────────────────────────────────────
+        // ── Game-Over / Multiplayer Overlay ───────────────────────────────────────────
+        if (mode == GameMode.MULTIPLAYER && !gameState.isGameOver) {
+            Box(
+                modifier = Modifier.padding(16.dp).align(Alignment.TopCenter)
+                    .background(Color(0x88000000), RoundedCornerShape(8.dp)).padding(12.dp)
+            ) {
+                Text("MULTIPLAYER MOCK\n(Local Bot-Game until Network is active)", color = Color.White, textAlign = TextAlign.Center)
+            }
+        }
+
         if (gameState.isGameOver) {
             GameOverScreen(state = gameState, onRestart = {
                 gameState = createInitialState()
