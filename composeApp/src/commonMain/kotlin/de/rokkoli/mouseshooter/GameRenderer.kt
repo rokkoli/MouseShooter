@@ -211,6 +211,14 @@ object GameRenderer {
             val frontY = c.y + sin(player.rotation) * radius
             drawCircle(color = Color.White.withAlpha(0.8f * playerAlpha), radius = 4f, center = Offset(frontX, frontY))
 
+            // Scharfschützen-Laser
+            if (player.inventory.activeWeapon == WeaponType.SNIPER) {
+                val dx = cos(player.rotation)
+                val dy = sin(player.rotation)
+                val laserEnd = Offset(c.x + dx * 3000f, c.y + dy * 3000f)
+                drawLine(color = Color(0xFFFF0000).withAlpha(0.8f * playerAlpha), start = c, end = laserEnd, strokeWidth = 1f)
+            }
+
             // HP-Balken
             val hpBarW = radius * 2.5f; val hpBarH = 4f
             val hpBarX = c.x - hpBarW / 2; val hpBarY = c.y - radius - 10f

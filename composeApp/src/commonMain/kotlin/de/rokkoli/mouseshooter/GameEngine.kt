@@ -77,7 +77,7 @@ object MapGenerator {
             val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
             val rarity = rarityFromDistance(dist, maxDist)
             val pool = if (rarity.ordinal >= Rarity.EPIC.ordinal)
-                listOf(WeaponType.SMG, WeaponType.FLAMETHROWER, WeaponType.ROCKET_LAUNCHER, WeaponType.SHOTGUN)
+                listOf(WeaponType.SMG, WeaponType.FLAMETHROWER, WeaponType.ROCKET_LAUNCHER, WeaponType.SHOTGUN, WeaponType.SNIPER, WeaponType.MINIGUN)
             else if (rarity.ordinal >= Rarity.RARE.ordinal)
                 listOf(WeaponType.SMG, WeaponType.SHOTGUN)
             else listOf(WeaponType.PISTOL, WeaponType.KNIFE, WeaponType.LONG_KNIFE, WeaponType.SHOTGUN)

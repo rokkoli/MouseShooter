@@ -78,10 +78,10 @@ fun GameScreen(mode: GameMode, onRestart: () -> Unit) {
                     })
                 }
 
-                // Schießen (Semi-Auto außer bei SMG/Flammenwerfer)
+                // Schießen (Semi-Auto außer bei SMG/Flammenwerfer/Minigun)
                 if (isLeftDown) {
                     val w = localPlayer?.inventory?.activeWeapon
-                    val isAuto = w == WeaponType.SMG || w == WeaponType.FLAMETHROWER
+                    val isAuto = w == WeaponType.SMG || w == WeaponType.FLAMETHROWER || w == WeaponType.MINIGUN
                     if (isAuto || !wasLeftDown) {
                         val localId = localPlayer?.id ?: -1
                         if (localId >= 0) {

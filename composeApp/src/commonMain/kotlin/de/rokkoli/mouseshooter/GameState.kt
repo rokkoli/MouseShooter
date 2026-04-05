@@ -22,7 +22,9 @@ enum class WeaponType(
     SMG("Maschinengewehr",    7f, 8f,  900f, 2f, 700f, 0xFF00AAFF),
     SHOTGUN("Schrotflinte",  10f, 1f,  850f, 2f, 450f, 0xFF884444),
     FLAMETHROWER("Flammenwerfer", 3f, 30f, 300f, 3f, 250f, 0xFFFF4400),
-    ROCKET_LAUNCHER("Raketenwerfer", 45f, 0.5f, 350f, 8f, 900f, 0xFFFF8800);
+    ROCKET_LAUNCHER("Raketenwerfer", 45f, 0.5f, 350f, 8f, 900f, 0xFFFF8800),
+    MINIGUN("Minigun", 5f, 18f, 1100f, 2f, 750f, 0xFF4455FF),
+    SNIPER("Sniper", 150f, 0.1f, 4000f, 2f, 10000f, 0xFFFF0033);
 }
 
 enum class GrenadeType(val label: String, val color: Long) {
@@ -51,12 +53,13 @@ enum class Rarity(val glowColor: Long, val label: String) {
 }
 
 fun rarityFromDistance(dist: Float, maxDist: Float): Rarity {
-    val t = (dist / maxDist).coerceIn(0f, 1f)
+    // Wunsch: Seltene Waffen können überall spawnen, auch innen
+    val r = kotlin.random.Random.nextFloat()
     return when {
-        t < 0.2f -> Rarity.COMMON
-        t < 0.4f -> Rarity.UNCOMMON
-        t < 0.6f -> Rarity.RARE
-        t < 0.8f -> Rarity.EPIC
+        r < 0.45f -> Rarity.COMMON
+        r < 0.70f -> Rarity.UNCOMMON
+        r < 0.88f -> Rarity.RARE
+        r < 0.96f -> Rarity.EPIC
         else      -> Rarity.LEGENDARY
     }
 }
