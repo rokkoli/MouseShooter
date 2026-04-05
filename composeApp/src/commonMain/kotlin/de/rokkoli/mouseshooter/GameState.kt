@@ -18,10 +18,10 @@ enum class WeaponType(
     KNIFE("Messer",          10f, 2.5f, 0f,  0f,  70f, 0xFFCCCCCC, true,  70f),
     LONG_KNIFE("Langmesser", 14f, 1.8f, 0f,  0f, 100f, 0xFFAABBCC, true,  90f),
     BOXING_GLOVES("Boxhandschuhe", 8f, 3f, 0f, 0f, 75f, 0xFFFF6600, true, 380f),
-    PISTOL("Pistole",        14f, 2f,  500f, 5f, 800f, 0xFFFFDD00),
-    SMG("Maschinengewehr",    7f, 8f,  600f, 4f, 700f, 0xFF00AAFF),
-    SHOTGUN("Schrotflinte",  10f, 1f,  550f, 4f, 450f, 0xFF884444),
-    FLAMETHROWER("Flammenwerfer", 3f, 15f, 300f, 6f, 250f, 0xFFFF4400),
+    PISTOL("Pistole",        14f, 2f,  800f, 2.5f, 800f, 0xFFFFDD00),
+    SMG("Maschinengewehr",    7f, 8f,  900f, 2f, 700f, 0xFF00AAFF),
+    SHOTGUN("Schrotflinte",  10f, 1f,  850f, 2f, 450f, 0xFF884444),
+    FLAMETHROWER("Flammenwerfer", 3f, 30f, 300f, 3f, 250f, 0xFFFF4400),
     ROCKET_LAUNCHER("Raketenwerfer", 45f, 0.5f, 350f, 8f, 900f, 0xFFFF8800);
 }
 
@@ -31,7 +31,8 @@ enum class GrenadeType(val label: String, val color: Long) {
     ELECTRIC("Elektrisiergranate", 0xFF8800FF),
     BAND("Bandgranate", 0xFF00FFFF),
     SMOKE("Rauchgranate", 0xFF888888),
-    FLASH("Blendgranate", 0xFFFFFFFF);
+    FLASH("Blendgranate", 0xFFFFFFFF),
+    MEDKIT("Medkit", 0xFFFF0000);
 }
 
 enum class ArmorType(val label: String, val color: Long) {
@@ -43,10 +44,10 @@ enum class ArmorType(val label: String, val color: Long) {
 // ─── Rarity ─────────────────────────────────────────────────────────────────
 enum class Rarity(val glowColor: Long, val label: String) {
     COMMON(0xFF888888, "Häufig"),
-    UNCOMMON(0xFF44FF44, "Ungewöhnlich"),
-    RARE(0xFF4488FF, "Selten"),
+    UNCOMMON(0xFF4488FF, "Ungewöhnlich"),
+    RARE(0xFF44FF44, "Selten"),
     EPIC(0xFFAA44FF, "Episch"),
-    LEGENDARY(0xFFFFAA00, "Legendär");
+    LEGENDARY(0xFFFFFF00, "Legendär");
 }
 
 fun rarityFromDistance(dist: Float, maxDist: Float): Rarity {
@@ -113,13 +114,6 @@ sealed class GroundItem(open val id: Int, open val pos: Vec2, open val rarity: R
         override val pos: Vec2,
         val armorType: ArmorType,
         override val rarity: Rarity,
-        var glowPhase: Float = 0f
-    ) : GroundItem(id, pos, rarity)
-
-    data class MedkitItem(
-        override val id: Int,
-        override val pos: Vec2,
-        override val rarity: Rarity = Rarity.UNCOMMON,
         var glowPhase: Float = 0f
     ) : GroundItem(id, pos, rarity)
 }
@@ -224,7 +218,8 @@ data class Player(
     val wanderAngle: Float = 0f,
     val wanderTimer: Float = 0f,
     val spreadAngle: Float = 0f,   // eindeutige Streurichtung beim Spawn
-    val hasDroppedLoot: Boolean = false
+    val hasDroppedLoot: Boolean = false,
+    val lastDamagedBy: Int = -1
 )
 
 // ─── Projektile ──────────────────────────────────────────────────────────────
@@ -251,7 +246,8 @@ data class Explosion(
     val duration: Float = 0.4f,
     val damage: Float = 0f,
     val color: Long = 0xFFFF8800,
-    var hasDealtDamage: Boolean = false
+    var hasDealtDamage: Boolean = false,
+    val ownerId: Int = -1
 )
 
 // ─── Granaten ────────────────────────────────────────────────────────────────
@@ -277,7 +273,7 @@ data class EffectZone(
     val alpha: Float = 0.4f
 )
 
-enum class ZoneType { SMOKE, SLOW_FIELD }
+enum class ZoneType { SMOKE, SLOW_FIELD, HEAL_FIELD }
 
 // ─── Kampfzone (schrumpfend) ─────────────────────────────────────────────────
 data class BattleZone(
@@ -322,5 +318,6 @@ data class GameState(
     val cameraX: Float = 0f,
     val cameraY: Float = 0f,
     val nextId: Int = 1000,
-    val zoomLevel: Float = 1.8f
+    val zoomLevel: Float = 1.8f,
+    val killFeed: List<String> = emptyList()
 )

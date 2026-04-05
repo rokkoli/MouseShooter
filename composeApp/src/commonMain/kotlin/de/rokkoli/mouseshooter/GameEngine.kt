@@ -61,8 +61,10 @@ object MapGenerator {
             val dist  = MIN_WEAPON_SPAWN_DIST + Random.nextFloat() * (maxDist * 0.88f - MIN_WEAPON_SPAWN_DIST)
             val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
             val rarity = rarityFromDistance(dist, maxDist)
-            val pool = if (rarity.ordinal >= Rarity.RARE.ordinal)
+            val pool = if (rarity.ordinal >= Rarity.EPIC.ordinal)
                 listOf(WeaponType.SMG, WeaponType.FLAMETHROWER, WeaponType.ROCKET_LAUNCHER, WeaponType.SHOTGUN)
+            else if (rarity.ordinal >= Rarity.RARE.ordinal)
+                listOf(WeaponType.SMG, WeaponType.SHOTGUN)
             else listOf(WeaponType.PISTOL, WeaponType.KNIFE, WeaponType.LONG_KNIFE, WeaponType.SHOTGUN)
             items.add(GroundItem.WeaponItem(idCounter++, pos, pool.random(), rarity))
         }
@@ -92,12 +94,12 @@ object MapGenerator {
                 listOf(WeaponType.KNIFE, WeaponType.LONG_KNIFE, WeaponType.BOXING_GLOVES).random(), Rarity.COMMON))
         }
 
-        // Medkits: 12 Stück
+        // Medkits: 12 Stück als Granaten
         repeat(12) {
             val angle = Random.nextFloat() * 2 * PI.toFloat()
             val dist  = 600f + Random.nextFloat() * (maxDist * 0.9f - 600f)
             val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
-            items.add(GroundItem.MedkitItem(idCounter++, pos, rarityFromDistance(dist, maxDist)))
+            items.add(GroundItem.GrenadeItem(idCounter++, pos, GrenadeType.MEDKIT, rarityFromDistance(dist, maxDist)))
         }
 
         return Pair(obstacles, items)
@@ -161,7 +163,6 @@ object GameEngine {
                 is GroundItem.WeaponItem  -> item.copy(glowPhase = (item.glowPhase + dt * 2f) % (2 * PI.toFloat()))
                 is GroundItem.GrenadeItem -> item.copy(glowPhase = (item.glowPhase + dt * 2f) % (2 * PI.toFloat()))
                 is GroundItem.ArmorItem   -> item.copy(glowPhase = (item.glowPhase + dt * 2f) % (2 * PI.toFloat()))
-                is GroundItem.MedkitItem  -> item.copy(glowPhase = (item.glowPhase + dt * 2f) % (2 * PI.toFloat()))
             }
         })
 
@@ -202,6 +203,29 @@ object GameEngine {
             }
             upd
         }, groundItems = nextItems, nextId = nId)
+
+        // Kill Feed (Todesliste)
+        val newKills = mutableListOf<String>()
+        val origAlive = state.players.filter { it.isAlive }
+        for (dead in origAlive) {
+            val nowDead = s.players.firstOrNull { it.id == dead.id }?.isAlive == false
+            if (nowDead) {
+                val newP = s.players.first { it.id == dead.id }
+                val killer = s.players.firstOrNull { it.id == newP.lastDamagedBy }
+                
+                val killerName = if (killer?.isLocalPlayer == true) "Du hast" else if (killer != null) "Bot ${killer.id} hat" else "Die Zone hat"
+                val victimName = if (dead.isLocalPlayer) "dich" else "Bot ${dead.id}"
+                newKills.add("$killerName $victimName eliminiert")
+                
+                if (killer != null && killer.id != dead.id) {
+                    s = s.copy(players = s.players.map { if (it.id == killer.id) it.copy(kills = it.kills + 1) else it })
+                }
+            }
+        }
+        if (newKills.isNotEmpty()) {
+            val updatedFeed = (s.killFeed + newKills).takeLast(5)
+            s = s.copy(killFeed = updatedFeed)
+        }
 
         // Kamera
         val local = s.players.firstOrNull { it.isLocalPlayer && it.isAlive }
@@ -289,7 +313,7 @@ object GameEngine {
                 val t = players[i]; if (!t.isAlive || t.isSpawning || t.id == p.ownerId) continue
                 if (t.pos.distanceTo(p.pos) < PLAYER_RADIUS + p.radius) {
                     val newHp = t.hp - p.damage
-                    players[i] = t.copy(hp = newHp.coerceAtLeast(0f), isAlive = newHp > 0f)
+                    players[i] = t.copy(hp = newHp.coerceAtLeast(0f), isAlive = newHp > 0f, lastDamagedBy = p.ownerId)
                     addExp(); hit = true; break
                 }
             }
@@ -313,7 +337,8 @@ object GameEngine {
                         val falloff = 1f - (dist / (exp.maxRadius + PLAYER_RADIUS)).coerceIn(0f, 1f)
                         val newHp = t.hp - exp.damage * falloff
                         players[i] = t.copy(hp = newHp.coerceAtLeast(0f), isAlive = newHp > 0f,
-                            velocity = t.velocity + (t.pos - exp.pos).normalized() * 300f * falloff)
+                            velocity = t.velocity + (t.pos - exp.pos).normalized() * 300f * falloff,
+                            lastDamagedBy = exp.ownerId)
                     }
                 }
             }
@@ -361,6 +386,7 @@ object GameEngine {
                     }
                     newExp.add(Explosion(g.pos, 200f, damage = 0f, color = 0xFFFFFFFFL))
                 }
+                GrenadeType.MEDKIT -> {}
             }
         }
         return state.copy(grenades = remaining, explosions = state.explosions + newExp,
@@ -380,6 +406,14 @@ object GameEngine {
                     if (tp.pos.distanceTo(zone.pos) < zone.radius + PLAYER_RADIUS)
                         players[i] = tp.copy(statusEffects = tp.statusEffects.copy(slowTimer = 0.5f, slowFactor = 0.25f))
                 }
+            } else if (zone.type == ZoneType.HEAL_FIELD) {
+                for (i in players.indices) {
+                    val tp = players[i]; if (!tp.isAlive) continue
+                    if (tp.pos.distanceTo(zone.pos) < zone.radius + PLAYER_RADIUS) {
+                        val newHp = (tp.hp + 20f * dt).coerceAtMost(tp.maxHp)
+                        players[i] = tp.copy(hp = newHp)
+                    }
+                }
             }
         }
         return state.copy(effectZones = remaining, players = players)
@@ -395,7 +429,7 @@ object GameEngine {
                 val t = players[i]; if (!t.isAlive || t.isSpawning || t.id == swing.ownerId) continue
                 if (t.pos.distanceTo(tipPos) < PLAYER_RADIUS * 2.5f) {
                     val newHp = t.hp - swing.damage; val kbDir = (t.pos - swing.pos).normalized()
-                    players[i] = t.copy(hp = newHp.coerceAtLeast(0f), isAlive = newHp > 0f, velocity = t.velocity + kbDir * swing.knockback)
+                    players[i] = t.copy(hp = newHp.coerceAtLeast(0f), isAlive = newHp > 0f, velocity = t.velocity + kbDir * swing.knockback, lastDamagedBy = swing.ownerId)
                 }
             }
             val ns = swing.copy(timer = swing.timer - dt); if (ns.timer > 0f) remaining.add(ns)
@@ -499,11 +533,20 @@ object GameEngine {
                     wanderAngle = bot.wanderAngle + (Random.nextFloat() - 0.5f) * PI.toFloat()
                     bot = bot.copy(wanderTimer = 3f + Random.nextFloat() * 2f)
                 }
-                val dir = (Vec2(cos(wanderAngle), sin(wanderAngle)) + separation * 0.5f).normalized()
+                var avoidance = Vec2(0f, 0f)
+                for (obs in state.obstacles) {
+                    val cx = bot.pos.x.coerceIn(obs.pos.x - 20f, obs.pos.x + obs.width + 20f)
+                    val cy = bot.pos.y.coerceIn(obs.pos.y - 20f, obs.pos.y + obs.height + 20f)
+                    val toWall = bot.pos - Vec2(cx, cy)
+                    val d = toWall.length()
+                    if (d < 80f && d > 0.1f) avoidance = avoidance + toWall.normalized() * ((80f - d) / 80f * 150f)
+                }
+                
+                val dir = (Vec2(cos(wanderAngle), sin(wanderAngle)) + separation * 0.5f + avoidance * 0.5f).normalized()
                 val newPos = (bot.pos + dir * PLAYER_SPEED * 0.7f * dt).clampToMap(state.mapWidth, state.mapHeight)
                 val resolved = resolveObstacleCollision(newPos, state.obstacles, PLAYER_RADIUS)
                 // Bei Hindernis-Kollision Winkel wechseln
-                val newAngle = if (resolved.distanceTo(bot.pos) < 2f) wanderAngle + PI.toFloat() / 2 else wanderAngle
+                val newAngle = if (resolved.distanceTo(bot.pos) < 2f && avoidance.length() < 1f) wanderAngle + PI.toFloat() / 2 else wanderAngle
                 bot = bot.copy(pos = resolved, wanderAngle = newAngle, rotation = atan2(dir.y, dir.x))
                 players[i] = bot; continue
             }
@@ -557,7 +600,16 @@ object GameEngine {
             
             // ── Stürmen (falls nicht gerade zum Versteck gelaufen) ─────────────
             if (!movementHandled && dist > weaponRange * 0.4f) {
-                val approach = (targetDir + separation * 0.4f).normalized()
+                var avoidance = Vec2(0f, 0f)
+                for (obs in state.obstacles) {
+                    val cx = bot.pos.x.coerceIn(obs.pos.x - 20f, obs.pos.x + obs.width + 20f)
+                    val cy = bot.pos.y.coerceIn(obs.pos.y - 20f, obs.pos.y + obs.height + 20f)
+                    val toWall = bot.pos - Vec2(cx, cy)
+                    val d = toWall.length()
+                    if (d < 80f && d > 0.1f) avoidance = avoidance + toWall.normalized() * ((80f - d) / 80f * 150f)
+                }
+                
+                val approach = (targetDir + separation * 0.4f + avoidance * 0.5f).normalized()
                 val speedMod = if (se.slowTimer > 0f) se.slowFactor else 1f
                 val newPos = (bot.pos + approach * PLAYER_SPEED * speedMod * dt).clampToMap(state.mapWidth, state.mapHeight)
                 bot = bot.copy(pos = resolveObstacleCollision(newPos, state.obstacles, PLAYER_RADIUS))
@@ -627,13 +679,26 @@ object GameEngine {
         val player = state.players.firstOrNull { it.id == playerId } ?: return state
         if (!player.isAlive || player.isSpawning) return state
         val inv = player.inventory; val grenadeType = inv.activeGrenade ?: return state
-        val dir = Vec2(cos(player.rotation), sin(player.rotation))
-        val grenade = ThrownGrenade(state.nextId, playerId, grenadeType, player.pos + dir * (PLAYER_RADIUS + 10f), dir * 350f, 0f)
+        
         val idx = inv.selectedSlotIndex - 4
         val newGrenades = inv.grenadeSlots.toMutableList(); if (idx in newGrenades.indices) newGrenades[idx] = null
+        val newInv = inv.copy(grenadeSlots = newGrenades)
+        
+        if (grenadeType == GrenadeType.MEDKIT) {
+            val se = player.statusEffects
+            return state.copy(
+                players = state.players.map { 
+                    if (it.id == playerId) it.copy(inventory = newInv, fireCooldown = 1f, statusEffects = se.copy(healRemaining = se.healRemaining + 40f)) 
+                    else it 
+                }
+            )
+        }
+        
+        val dir = Vec2(cos(player.rotation), sin(player.rotation))
+        val grenade = ThrownGrenade(state.nextId, playerId, grenadeType, player.pos + dir * (PLAYER_RADIUS + 10f), dir * 350f, 0f)
         return state.copy(
             grenades = state.grenades + grenade, nextId = state.nextId + 1,
-            players = state.players.map { if (it.id == playerId) it.copy(inventory = inv.copy(grenadeSlots = newGrenades), fireCooldown = 1f) else it }
+            players = state.players.map { if (it.id == playerId) it.copy(inventory = newInv, fireCooldown = 1f) else it }
         )
     }
 
@@ -669,14 +734,6 @@ object GameEngine {
             }
             is GroundItem.GrenadeItem -> player.inventory.addGrenade(item.grenadeType)
             is GroundItem.ArmorItem   -> player.inventory.addArmor(item.armorType)
-            is GroundItem.MedkitItem  -> {
-                return state.copy(
-                    players = state.players.map { 
-                        if (it.id == playerId) it.copy(statusEffects = it.statusEffects.copy(healRemaining = it.statusEffects.healRemaining + 40f)) else it 
-                    },
-                    groundItems = state.groundItems.filter { it.id != item.id }
-                )
-            }
         }
         
         val newItems = state.groundItems.filter { it.id != item.id }.toMutableList()

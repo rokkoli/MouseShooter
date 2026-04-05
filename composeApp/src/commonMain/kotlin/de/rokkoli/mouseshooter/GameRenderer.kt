@@ -59,8 +59,26 @@ object GameRenderer {
         for (zone in state.effectZones) {
             val c = zone.pos.toOffset(camX, camY, screenW, screenH, zoom)
             val r = zone.radius * zoom
-            drawCircle(color = Color(zone.color).withAlpha(zone.alpha * 0.5f), radius = r, center = c)
-            drawCircle(color = Color(zone.color).withAlpha(zone.alpha), radius = r, center = c, style = Stroke(2f))
+            if (zone.type == ZoneType.SMOKE) {
+                var prng = zone.id.toLong() * 123456789L
+                for (i in 0..15) {
+                    prng = (prng * 1103515245L + 12345L) and 0x7FFFFFFFL
+                    val angle = (prng % 1000) / 1000f * 2 * PI.toFloat()
+                    prng = (prng * 1103515245L + 12345L) and 0x7FFFFFFFL
+                    val dist = (prng % 1000) / 1000f * r * 0.6f
+                    prng = (prng * 1103515245L + 12345L) and 0x7FFFFFFFL
+                    val pr = zoom * (30f + (prng % 1000) / 1000f * 30f)
+                    val px = c.x + cos(angle) * dist
+                    val py = c.y + sin(angle) * dist
+                    
+                    val progress = (zone.timer / zone.duration).coerceIn(0f, 1f)
+                    val factor = if (progress < 0.1f) progress / 0.1f else if (progress > 0.8f) (1f - progress) / 0.2f else 1f
+                    drawCircle(color = Color(zone.color).withAlpha(1f), radius = pr * factor, center = Offset(px, py))
+                }
+            } else {
+                drawCircle(color = Color(zone.color).withAlpha(zone.alpha * 0.5f), radius = r, center = c)
+                drawCircle(color = Color(zone.color).withAlpha(zone.alpha), radius = r, center = c, style = Stroke(2f))
+            }
         }
 
         // ── Ground Items (mit Glow) ───────────────────────────────────────────
@@ -72,7 +90,6 @@ object GameRenderer {
                 is GroundItem.WeaponItem  -> item.glowPhase
                 is GroundItem.GrenadeItem -> item.glowPhase
                 is GroundItem.ArmorItem   -> item.glowPhase
-                is GroundItem.MedkitItem  -> item.glowPhase
             }
             val glowAlpha  = (sin(glowPhase) * 0.4f + 0.5f).coerceIn(0f, 1f)
             val glowRadius = (14f + sin(glowPhase) * 4f) * zoom
@@ -83,9 +100,11 @@ object GameRenderer {
 
             when (item) {
                 is GroundItem.WeaponItem  -> drawWeaponIcon(c, item.weaponType, glowRadius)
-                is GroundItem.GrenadeItem -> drawGrenadeIcon(c, item.grenadeType, glowRadius)
+                is GroundItem.GrenadeItem -> {
+                    if (item.grenadeType == GrenadeType.MEDKIT) drawMedkitIcon(c, glowRadius)
+                    else drawGrenadeIcon(c, item.grenadeType, glowRadius)
+                }
                 is GroundItem.ArmorItem   -> drawArmorIcon(c, item.armorType, glowRadius)
-                is GroundItem.MedkitItem  -> drawMedkitIcon(c, glowRadius)
             }
         }
 

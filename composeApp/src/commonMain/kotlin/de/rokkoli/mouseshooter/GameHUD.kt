@@ -2,6 +2,7 @@ package de.rokkoli.mouseshooter
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -13,6 +14,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.*
+import androidx.compose.foundation.gestures.detectDragGestures
 
 // ─── HUD-Farben ───────────────────────────────────────────────────────────────
 private val HudBackground = Color(0xCC000000)
@@ -27,6 +35,7 @@ private val SlotBorder = Color(0xFF555566)
 fun GameHUD(
     state: GameState,
     localPlayer: Player?,
+    onArmorClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (localPlayer == null) return
@@ -39,8 +48,11 @@ fun GameHUD(
         // ── Top-Right: Kill-Count ─────────────────────────────────────────────
         KillCounter(localPlayer, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp))
 
+        // ── Center-Right: Kill-Feed ───────────────────────────────────────────
+        KillFeedOverlay(state.killFeed, modifier = Modifier.align(Alignment.CenterEnd).padding(12.dp))
+
         // ── Bottom-Center: Inventar-Slots ─────────────────────────────────────
-        InventoryBar(localPlayer, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
+        InventoryBar(localPlayer, onArmorClick, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
 
         // ── Bottom-Right: Minimap-Platzhalter (wird per Canvas gezeichnet) ────
         MinimapLabel(modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp))
@@ -97,7 +109,7 @@ private fun KillCounter(player: Player, modifier: Modifier) {
 }
 
 @Composable
-fun InventoryBar(player: Player, modifier: Modifier) {
+fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
     val inv = player.inventory
     val allSlots: List<Pair<String, Long?>> = buildList {
         add(Pair(inv.meleeSlot?.label ?: "—", inv.meleeSlot?.color))
@@ -132,14 +144,16 @@ fun InventoryBar(player: Player, modifier: Modifier) {
                 Box(
                     modifier = Modifier
                         .size(if (index == 6) 50.dp else 58.dp, if (index == 6) 50.dp else 58.dp)
-                        .background(
-                            if (isActive) Color(0x4400CCFF) else SlotInactive,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clip(RoundedCornerShape(8.dp))
                         .then(
-                            if (isActive) Modifier.background(Color(0x2200AAFF), RoundedCornerShape(8.dp))
-                            else Modifier
+                            if (index == 6) {
+                                Modifier.background(if (isActive) Color(0x4400CCFF) else SlotInactive, RoundedCornerShape(8.dp))
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { onArmorClick() }
+                            } else {
+                                Modifier.background(if (isActive) Color(0x4400CCFF) else SlotInactive, RoundedCornerShape(8.dp))
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .then(if (isActive) Modifier.background(Color(0x2200AAFF), RoundedCornerShape(8.dp)) else Modifier)
+                            }
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -220,8 +234,8 @@ private fun SkillIndicator(player: Player, modifier: Modifier) {
 
     val skillName = when (armor) {
         ArmorType.MILITARY -> "Passiv: Resistenz"
-        ArmorType.STEALTH -> "Q: Unsichtbarkeit"
-        ArmorType.AGILITY -> "Q: Dash (${if (cooldown > 0f) "${cooldown.toInt()}s" else "Bereit!"})"
+        ArmorType.STEALTH -> "Klick: Unsichtbarkeit"
+        ArmorType.AGILITY -> "Klick: Dash (${if (cooldown > 0f) "${cooldown.toInt()}s" else "Bereit!"})"
     }
 
     Box(
@@ -258,6 +272,23 @@ private fun HudChip(text: String, color: Color) {
         Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
+// ─── Kill Feed ────────────────────────────────────────────────────────────────
+@Composable
+private fun KillFeedOverlay(feed: List<String>, modifier: Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.End) {
+        for (event in feed) {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 2.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(event, color = Color.White, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
 
 // ─── Spawn-Countdown ────────────────────────────────────────────────────────────
 @Composable
@@ -370,7 +401,7 @@ fun MainMenu(onStart: () -> Unit) {
                     controlRow("LMB: Granate", "Granate werfen (aktiver Slot)")
                     controlRow("Mausrad scrollen", "Waffe/Item wechseln")
                     controlRow("Mausrad klicken", "Item vom Boden aufheben")
-                    controlRow("Q", "Skill aktivieren (Rüstung)")
+                    controlRow("Klick auf Rüstung", "Rüstungs-Skill aktivieren")
                     Spacer(Modifier.height(10.dp))
                     Text("🪂 Alle Spieler starten mit Fallschirm", color = Color(0xFF4499FF), fontSize = 11.sp)
                     Text("💡 Seltenere Items spawnen weiter vom Zentrum", color = Color(0xFF666677), fontSize = 11.sp)

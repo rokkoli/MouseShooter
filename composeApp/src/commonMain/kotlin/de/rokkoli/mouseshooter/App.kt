@@ -39,18 +39,18 @@ fun GameScreen(onRestart: () -> Unit) {
     var mousePos    by remember { mutableStateOf(Vec2(400f, 300f)) }
     var isRightDown by remember { mutableStateOf(false) }
     var isLeftDown  by remember { mutableStateOf(false) }
+    var wasLeftDown by remember { mutableStateOf(false) }
     var screenSize  by remember { mutableStateOf(Vec2(1280f, 800f)) }
 
     val focusRequester = remember { FocusRequester() }
-    var lastTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    var lastMark by remember { mutableStateOf(kotlin.time.TimeSource.Monotonic.markNow()) }
 
     // ── Game-Loop ─────────────────────────────────────────────────────────────
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
         while (isActive) {
-            val now = System.currentTimeMillis()
-            val dt  = ((now - lastTime) / 1000f).coerceAtMost(0.05f)
-            lastTime = now
+            val dt  = (lastMark.elapsedNow().inWholeMilliseconds / 1000f).toFloat().coerceAtMost(0.05f)
+            lastMark = kotlin.time.TimeSource.Monotonic.markNow()
 
             if (!gameState.isGameOver) {
                 val zoom = gameState.zoomLevel
@@ -66,13 +66,18 @@ fun GameScreen(onRestart: () -> Unit) {
                     })
                 }
 
-                // Schießen (Dauerfeuer bei gedrückter LMB)
+                // Schießen (Semi-Auto außer bei SMG/Flammenwerfer)
                 if (isLeftDown) {
-                    val localId = gameState.players.firstOrNull { it.isLocalPlayer }?.id ?: -1
-                    if (localId >= 0) {
-                        gameState = GameEngine.shoot(gameState, localId)
+                    val w = localPlayer?.inventory?.activeWeapon
+                    val isAuto = w == WeaponType.SMG || w == WeaponType.FLAMETHROWER
+                    if (isAuto || !wasLeftDown) {
+                        val localId = localPlayer?.id ?: -1
+                        if (localId >= 0) {
+                            gameState = GameEngine.shoot(gameState, localId)
+                        }
                     }
                 }
+                wasLeftDown = isLeftDown
 
                 // Update
                 gameState = GameEngine.update(gameState, dt, mousePos, isRightDown, screenSize)
@@ -90,26 +95,7 @@ fun GameScreen(onRestart: () -> Unit) {
             .background(Color.Black)
             .focusRequester(focusRequester)
             .focusable()
-            // ── Tastaturevents ────────────────────────────────────────────────
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown) {
-                    val localId = gameState.players.firstOrNull { it.isLocalPlayer }?.id ?: -1
-                    when (event.key) {
-                        Key.Q -> {
-                            if (localId >= 0) {
-                                val armor = gameState.players.firstOrNull { it.isLocalPlayer }?.inventory?.armorSlot
-                                gameState = when (armor) {
-                                    ArmorType.AGILITY -> GameEngine.dash(gameState, localId)
-                                    ArmorType.STEALTH -> GameEngine.activateStealth(gameState, localId)
-                                    else -> gameState
-                                }
-                            }
-                            true
-                        }
-                        else -> false
-                    }
-                } else false
-            }
+
             // ── Maus-Tracking ─────────────────────────────────────────────────
             .pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -169,7 +155,20 @@ fun GameScreen(onRestart: () -> Unit) {
 
         // ── HUD (Compose-Layer) ───────────────────────────────────────────────
         if (!gameState.isGameOver) {
-            GameHUD(state = gameState, localPlayer = localPlayer)
+            GameHUD(
+                state = gameState,
+                localPlayer = localPlayer,
+                onArmorClick = {
+                    val player = gameState.players.firstOrNull { it.isLocalPlayer && it.isAlive }
+                    if (player != null) {
+                        gameState = when (player.inventory.armorSlot) {
+                            ArmorType.AGILITY -> GameEngine.dash(gameState, player.id)
+                            ArmorType.STEALTH -> GameEngine.activateStealth(gameState, player.id)
+                            else -> gameState
+                        }
+                    }
+                }
+            )
 
             // Spawn-Countdown oben in der Mitte
             val spawningPlayer = localPlayer
