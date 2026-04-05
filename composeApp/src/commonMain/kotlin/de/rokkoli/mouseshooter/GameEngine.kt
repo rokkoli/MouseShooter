@@ -16,41 +16,56 @@ object MapGenerator {
         val items = mutableListOf<GroundItem>()
         var idCounter = 0
         val center = Vec2(mapW / 2, mapH / 2)
+        val cols = 12
+        val rows = 12
+        val cellW = (mapW - 800f) / cols
+        val cellH = (mapH - 800f) / rows
+        val startX = 400f
+        val startY = 400f
 
-        // Häuser über die gesamte große Map verteilt
-        val houseOffsets = listOf(
-            Triple(-1200f, -1000f, 0xFF665544L), Triple(900f,  -1100f, 0xFF554455L),
-            Triple(-1500f,  800f,  0xFF445566L), Triple(1100f,  1000f, 0xFF664444L),
-            Triple(-400f,   1300f, 0xFF556644L), Triple(1500f,  -400f, 0xFF446655L),
-            Triple(-1800f, -300f,  0xFF665544L), Triple(1700f,   700f, 0xFF554455L),
-            Triple(0f,    -1700f,  0xFF663344L), Triple(-800f, -1800f, 0xFF445533L),
-            Triple(2000f,  1200f,  0xFF556633L), Triple(-2300f,  900f, 0xFF664433L),
-            Triple(1200f, -2100f,  0xFF445577L), Triple(-1600f, 1700f, 0xFF553355L),
-            Triple(2000f, -1600f,  0xFF665544L), Triple(-1000f, 2200f, 0xFF664433L),
-            Triple(300f,   2000f,  0xFF445566L), Triple(-2100f,-1200f, 0xFF553344L),
-            Triple(2500f,  -400f,  0xFF665544L), Triple(-2600f,  200f, 0xFF554455L),
-            Triple(400f,  -2600f,  0xFF663344L), Triple(-400f,  2600f, 0xFF445566L),
-            Triple(1800f,  2200f,  0xFF554433L), Triple(-1800f,-2200f, 0xFF664455L),
-            Triple(2800f,  1000f,  0xFF445533L), Triple(-2800f,-1000f, 0xFF663344L),
-        )
-        for ((x, y, color) in houseOffsets) {
-            val w = Random.nextFloat() * 120f + 80f
-            val h = Random.nextFloat() * 120f + 80f
-            obstacles.add(Obstacle(Vec2(x + center.x, y + center.y), w, h, color))
-        }
+        for (row in 0 until rows) {
+            for (col in 0 until cols) {
+                val cx = startX + col * cellW + cellW / 2f
+                val cy = startY + row * cellH + cellH / 2f
+                val pos = Vec2(cx, cy)
+                
+                // Zentrum frei lassen für das Endgame
+                if (pos.distanceTo(center) < 600f) continue
+                
+                // 30% Chance, Zelle komplett freizulassen
+                if (Random.nextFloat() < 0.3f) continue
 
-        // Lange Mauern
-        val walls = listOf(
-            Qd(-700f, -400f, 300f, 16f), Qd(300f, 700f, 16f, 280f),
-            Qd(-900f, 300f,  240f, 16f), Qd(600f, -700f, 16f, 260f),
-            Qd(-200f,-1200f, 380f, 16f), Qd(1200f, 200f, 220f, 16f),
-            Qd(-1300f,-700f, 16f, 320f), Qd(1000f,1000f, 16f, 260f),
-            Qd(-900f, 1200f, 320f, 16f), Qd(400f,-1400f, 260f, 16f),
-            Qd(1600f, -800f, 16f, 300f), Qd(-1600f, 600f, 300f, 16f),
-            Qd(800f,  1800f, 220f, 16f), Qd(-2000f,-400f, 16f, 280f),
-        )
-        for ((x, y, w, h) in walls) {
-            obstacles.add(Obstacle(Vec2(x + center.x, y + center.y), w, h, 0xFF888899L))
+                val choice = Random.nextInt(5)
+                when (choice) {
+                    0 -> { // Einfacher Block (Haus)
+                        val w = Random.nextFloat() * 150f + 100f
+                        val h = Random.nextFloat() * 150f + 100f
+                        obstacles.add(Obstacle(pos, w, h, 0xFF665544L))
+                    }
+                    1 -> { // L-Wand
+                        obstacles.add(Obstacle(pos, 16f, 250f, 0xFF778899L))
+                        obstacles.add(Obstacle(Vec2(pos.x + 120f, pos.y + 120f), 240f, 16f, 0xFF778899L))
+                    }
+                    2 -> { // U-Form (Bunker/Deckung)
+                        obstacles.add(Obstacle(Vec2(pos.x - 100f, pos.y), 16f, 180f, 0xFF556655L))
+                        obstacles.add(Obstacle(Vec2(pos.x + 100f, pos.y), 16f, 180f, 0xFF556655L))
+                        obstacles.add(Obstacle(Vec2(pos.x, pos.y + 90f), 216f, 16f, 0xFF556655L))
+                    }
+                    3 -> { // Kleine Pfeiler / Kisten
+                        obstacles.add(Obstacle(Vec2(pos.x - 60f, pos.y - 60f), 40f, 40f, 0xFF554444L))
+                        obstacles.add(Obstacle(Vec2(pos.x + 60f, pos.y - 60f), 40f, 40f, 0xFF554444L))
+                        obstacles.add(Obstacle(Vec2(pos.x - 60f, pos.y + 60f), 40f, 40f, 0xFF554444L))
+                        obstacles.add(Obstacle(Vec2(pos.x + 60f, pos.y + 60f), 40f, 40f, 0xFF554444L))
+                    }
+                    4 -> { // Lange Mauer horizontal oder vertikal
+                        if (Random.nextBoolean()) {
+                            obstacles.add(Obstacle(pos, 400f, 16f, 0xFFAABBCCL))
+                        } else {
+                            obstacles.add(Obstacle(pos, 16f, 400f, 0xFFAABBCCL))
+                        }
+                    }
+                }
+            }
         }
 
         val maxDist = sqrt(mapW * mapW + mapH * mapH) / 2f
@@ -105,7 +120,7 @@ object MapGenerator {
         return Pair(obstacles, items)
     }
 
-    private data class Qd(val x: Float, val y: Float, val w: Float, val h: Float)
+    
 }
 
 fun Vec2.clampToMap(w: Float, h: Float) = Vec2(x.coerceIn(50f, w - 50f), y.coerceIn(50f, h - 50f))
@@ -581,8 +596,9 @@ object GameEngine {
             // ── Angreifen ─────────────────────────────────────────────────────
             if (dist < weaponRange * 0.85f && bot.fireCooldown <= 0f) {
                 if (activeWeapon?.isMelee == true) {
-                    newMeleeSwings.add(MeleeSwing(bot.id, bot.pos, targetDir, activeWeapon.range, activeWeapon.damage, activeWeapon.knockback))
-                    bot = bot.copy(fireCooldown = 1f / activeWeapon.fireRate)
+                    val isLeft = !bot.lastMeleeLeft
+                    newMeleeSwings.add(MeleeSwing(bot.id, activeWeapon, isLeft, bot.pos, targetDir, activeWeapon.range, activeWeapon.damage, activeWeapon.knockback))
+                    bot = bot.copy(fireCooldown = 1f / activeWeapon.fireRate, lastMeleeLeft = isLeft)
                 } else if (activeWeapon != null) {
                     newProjectiles.add(Projectile(
                         id = nextId++, ownerId = bot.id,
@@ -655,7 +671,11 @@ object GameEngine {
 
         if (weapon.isMelee) {
             val dir = Vec2(cos(player.rotation), sin(player.rotation))
-            newState = newState.copy(meleeSwings = newState.meleeSwings + MeleeSwing(playerId, player.pos, dir, weapon.range, weapon.damage, weapon.knockback))
+            val isLeft = !player.lastMeleeLeft
+            newState = newState.copy(
+                meleeSwings = newState.meleeSwings + MeleeSwing(playerId, weapon, isLeft, player.pos, dir, weapon.range, weapon.damage, weapon.knockback),
+                players = newState.players.map { if (it.id == playerId) it.copy(lastMeleeLeft = isLeft) else it }
+            )
         } else {
             val spreadCount = if (weapon == WeaponType.FLAMETHROWER) 5 else if (weapon == WeaponType.SHOTGUN) 8 else 1
             val spread = if (weapon == WeaponType.FLAMETHROWER) 0.3f else if (weapon == WeaponType.SHOTGUN) 0.5f else 0.02f

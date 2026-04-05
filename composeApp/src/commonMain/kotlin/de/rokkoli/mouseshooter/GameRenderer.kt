@@ -140,10 +140,44 @@ object GameRenderer {
         // ── Melee-Visualisierung ──────────────────────────────────────────────
         for (swing in state.meleeSwings) {
             val start = swing.pos.toOffset(camX, camY, screenW, screenH, zoom)
-            val end   = (swing.pos + swing.direction * swing.range).toOffset(camX, camY, screenW, screenH, zoom)
-            val alpha = swing.timer / 0.15f
-            drawLine(color = Color.White.withAlpha(alpha.coerceIn(0f, 1f)), start = start, end = end, strokeWidth = 3f)
-            drawCircle(color = Color.White.withAlpha(alpha * 0.5f), radius = 12f, center = end)
+            val baseAngle = atan2(swing.direction.y, swing.direction.x)
+            val alpha = (swing.timer / 0.15f).coerceIn(0f, 1f)
+            val progress = 1f - alpha
+            val isLeftOffset = if (swing.isLeft) -1f else 1f
+
+            when (swing.weapon) {
+                WeaponType.LONG_KNIFE -> {
+                    // Weites Schwingen (Sweep)
+                    val swingAngle = baseAngle + isLeftOffset * (PI.toFloat() / 2f) * (1f - progress * 1.5f)
+                    val dir = Offset(cos(swingAngle), sin(swingAngle))
+                    val end = start + dir * (swing.range * zoom)
+                    drawLine(color = Color.LightGray.withAlpha(alpha), start = start, end = end, strokeWidth = 5f * zoom)
+                }
+                WeaponType.KNIFE -> {
+                    // Links/Rechts Stechen
+                    val latDir = Offset(cos(baseAngle + PI.toFloat() / 2f), sin(baseAngle + PI.toFloat() / 2f))
+                    val lateralOffset = latDir * (12f * isLeftOffset * zoom)
+                    val advance = kotlin.math.sin(progress * PI.toFloat())
+                    val adjustedStart = start + lateralOffset + Offset(swing.direction.x, swing.direction.y) * 10f * zoom
+                    val end = adjustedStart + Offset(swing.direction.x, swing.direction.y) * (swing.range * zoom * advance)
+                    drawLine(color = Color.White.withAlpha(alpha), start = adjustedStart, end = end, strokeWidth = 3f * zoom)
+                    drawCircle(color = Color.White.withAlpha(alpha * 0.8f), radius = 4f * zoom, center = end)
+                }
+                WeaponType.BOXING_GLOVES, WeaponType.FISTS -> {
+                    // Links/Rechts Boxen
+                    val latDir = Offset(cos(baseAngle + PI.toFloat() / 2f), sin(baseAngle + PI.toFloat() / 2f))
+                    val lateralOffset = latDir * (16f * isLeftOffset * zoom)
+                    val advance = kotlin.math.sin(progress * PI.toFloat())
+                    val gloveCenter = start + lateralOffset + Offset(swing.direction.x, swing.direction.y) * (swing.range * zoom * advance)
+                    val col = if (swing.weapon == WeaponType.BOXING_GLOVES) Color(0xFFFF3300) else Color(0xFFFFAAAA)
+                    drawCircle(color = col.withAlpha(alpha), radius = 14f * zoom, center = gloveCenter)
+                    drawCircle(color = Color.Black.withAlpha(alpha), radius = 14f * zoom, center = gloveCenter, style = Stroke(2f))
+                }
+                else -> {
+                    val end = start + Offset(swing.direction.x, swing.direction.y) * (swing.range * zoom)
+                    drawLine(color = Color.White.withAlpha(alpha), start = start, end = end, strokeWidth = 3f)
+                }
+            }
         }
 
         // ── Spieler ───────────────────────────────────────────────────────────

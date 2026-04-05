@@ -15,9 +15,9 @@ enum class WeaponType(
     val knockback: Float = 0f
 ) {
     FISTS("Fäuste",          6f,  2f,   0f,  0f,  80f, 0xFFFFAAAA, true, 180f),
-    KNIFE("Messer",          10f, 2.5f, 0f,  0f,  70f, 0xFFCCCCCC, true,  70f),
-    LONG_KNIFE("Langmesser", 14f, 1.8f, 0f,  0f, 100f, 0xFFAABBCC, true,  90f),
-    BOXING_GLOVES("Boxhandschuhe", 8f, 3f, 0f, 0f, 75f, 0xFFFF6600, true, 380f),
+    KNIFE("Messer",          10f, 4f,   0f,  0f,  70f, 0xFFCCCCCC, true,  70f),
+    LONG_KNIFE("Langmesser", 20f, 2.5f, 0f,  0f, 100f, 0xFFAABBCC, true,  90f),
+    BOXING_GLOVES("Boxhandschuhe", 2f, 5f, 0f, 0f, 75f, 0xFFFF6600, true, 380f),
     PISTOL("Pistole",        14f, 2f,  800f, 2.5f, 800f, 0xFFFFDD00),
     SMG("Maschinengewehr",    7f, 8f,  900f, 2f, 700f, 0xFF00AAFF),
     SHOTGUN("Schrotflinte",  10f, 1f,  850f, 2f, 450f, 0xFF884444),
@@ -219,7 +219,8 @@ data class Player(
     val wanderTimer: Float = 0f,
     val spreadAngle: Float = 0f,   // eindeutige Streurichtung beim Spawn
     val hasDroppedLoot: Boolean = false,
-    val lastDamagedBy: Int = -1
+    val lastDamagedBy: Int = -1,
+    val lastMeleeLeft: Boolean = false
 )
 
 // ─── Projektile ──────────────────────────────────────────────────────────────
@@ -291,6 +292,8 @@ data class BattleZone(
 // ─── Melee-Hitbox ────────────────────────────────────────────────────────────
 data class MeleeSwing(
     val ownerId: Int,
+    val weapon: WeaponType,
+    val isLeft: Boolean,
     val pos: Vec2,
     val direction: Vec2,
     val range: Float,

@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,25 +77,26 @@ private fun TopStatusBar(state: GameState, player: Player, modifier: Modifier) {
     Column(modifier = modifier) {
         // Spieleranzahl
         val alivePlayers = state.players.count { it.isAlive }
-        HudChip(text = "👥 $alivePlayers / ${state.players.size}", color = HudAccent)
+        HudChip(text = "$alivePlayers / ${state.players.size}", color = HudAccent, icon = Icons.Default.Person)
 
         Spacer(Modifier.height(6.dp))
 
         // Zonenwarnung
         HudChip(
-            text = if (isInZone) "✅ In der Zone" else "⚠️ ZONE VERLASSEN!",
-            color = if (isInZone) Color(0xFF44FF44) else Color(0xFFFF3300)
+            text = if (isInZone) "In der Zone" else "ZONE VERLASSEN!",
+            color = if (isInZone) Color(0xFF44FF44) else Color(0xFFFF3300),
+            icon = if (isInZone) Icons.Default.Check else Icons.Default.Warning
         )
 
         Spacer(Modifier.height(6.dp))
 
         // Status-Effekte
         val se = player.statusEffects
-        if (se.stunTimer > 0f) HudChip("⚡ Stunned ${se.stunTimer.toInt()}s", Color(0xFF8800FF))
-        if (se.slowTimer > 0f) HudChip("🧊 Slow ${se.slowTimer.toInt()}s", Color(0xFF00CCFF))
-        if (se.blindTimer > 0f) HudChip("👁️ Geblendet ${se.blindTimer.toInt()}s", Color.White)
-        if (se.invisibleTimer > 0f) HudChip("👻 Unsichtbar ${se.invisibleTimer.toInt()}s", Color(0xFF44CC44))
-        if (se.healRemaining > 0f) HudChip("💉 Heilung läuft", Color(0xFFFF3344))
+        if (se.stunTimer > 0f) HudChip("Gestunnt ${se.stunTimer.toInt()}s", Color(0xFF8800FF), Icons.Default.Build)
+        if (se.slowTimer > 0f) HudChip("Verlangsamt ${se.slowTimer.toInt()}s", Color(0xFF00CCFF), Icons.Default.Refresh)
+        if (se.blindTimer > 0f) HudChip("Geblendet ${se.blindTimer.toInt()}s", Color.White, Icons.Default.Close)
+        if (se.invisibleTimer > 0f) HudChip("Unsichtbar ${se.invisibleTimer.toInt()}s", Color(0xFF44CC44), Icons.Default.Face)
+        if (se.healRemaining > 0f) HudChip("Heilung läuft", Color(0xFFFF3344), Icons.Default.Favorite)
     }
 }
 
@@ -104,7 +107,11 @@ private fun KillCounter(player: Player, modifier: Modifier) {
             .background(HudBackground, RoundedCornerShape(8.dp))
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
-        Text("💀 ${player.kills}", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Clear, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("${player.kills}", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -203,12 +210,16 @@ private fun HpBar(player: Player, modifier: Modifier) {
         else -> Color(0xFFFF4444)
     }
     Column(modifier = modifier) {
-        Text(
-            "❤️ ${player.hp.toInt()} / ${player.maxHp.toInt()}",
-            color = hpColor,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Favorite, contentDescription = null, tint = hpColor, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(
+                "${player.hp.toInt()} / ${player.maxHp.toInt()}",
+                color = hpColor,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
         Spacer(Modifier.height(3.dp))
         Box(
             modifier = Modifier
@@ -263,13 +274,19 @@ private fun MinimapLabel(modifier: Modifier) {
 }
 
 @Composable
-private fun HudChip(text: String, color: Color) {
+private fun HudChip(text: String, color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     Box(
         modifier = Modifier
             .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(20.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
-        Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+            }
+            Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 // ─── Kill Feed ────────────────────────────────────────────────────────────────
@@ -301,12 +318,16 @@ fun SpawnCountdown(spawnTimer: Float) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(top = 60.dp)
         ) {
-            Text(
-                text = "🪂 Fallschirm-Landung",
-                color = Color(0xFF00CCFF),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(0xFF00CCFF), modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "Landungspunkt festlegen",
+                    color = Color(0xFF00CCFF),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             Spacer(Modifier.height(6.dp))
             Box(
                 modifier = Modifier
@@ -337,8 +358,10 @@ fun GameOverScreen(state: GameState, onRestart: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(if (playerWon) Icons.Default.Star else Icons.Default.Clear, contentDescription = null, tint = if (playerWon) Color(0xFFFFD700) else Color(0xFFFF4444), modifier = Modifier.size(72.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
-                if (playerWon) "🏆 VICTORY!" else "💀 ELIMINATED",
+                if (playerWon) "VICTORY!" else "ELIMINATED",
                 color = if (playerWon) Color(0xFFFFD700) else Color(0xFFFF4444),
                 fontSize = 48.sp,
                 fontWeight = FontWeight.ExtraBold
@@ -393,7 +416,11 @@ fun MainMenu(onStart: () -> Unit) {
                 modifier = Modifier.width(380.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("🎮 Steuerung", color = Color(0xFF00CCFF), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Build, contentDescription = null, tint = Color(0xFF00CCFF), modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("STEUERUNG", color = Color(0xFF00CCFF), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
                     Spacer(Modifier.height(10.dp))
                     controlRow("Mausbewegung", "Charakter läuft in Richtung Maus")
                     controlRow("Rechte Maustaste", "Anhalten (stehen bleiben)")
@@ -403,9 +430,9 @@ fun MainMenu(onStart: () -> Unit) {
                     controlRow("Mausrad klicken", "Item vom Boden aufheben")
                     controlRow("Klick auf Rüstung", "Rüstungs-Skill aktivieren")
                     Spacer(Modifier.height(10.dp))
-                    Text("🪂 Alle Spieler starten mit Fallschirm", color = Color(0xFF4499FF), fontSize = 11.sp)
-                    Text("💡 Seltenere Items spawnen weiter vom Zentrum", color = Color(0xFF666677), fontSize = 11.sp)
-                    Text("⚠️ Die Kampfzone schrumpft – bleib drin!", color = Color(0xFFFF6644), fontSize = 11.sp)
+                    Text("INFO: Alle Spieler starten mit Fallschirm", color = Color(0xFF4499FF), fontSize = 11.sp)
+                    Text("INFO: Seltenere Items spawnen weiter vom Zentrum", color = Color(0xFF666677), fontSize = 11.sp)
+                    Text("WARNUNG: Die Kampfzone schrumpft – bleib drin!", color = Color(0xFFFF6644), fontSize = 11.sp)
                 }
             }
             Spacer(Modifier.height(32.dp))
