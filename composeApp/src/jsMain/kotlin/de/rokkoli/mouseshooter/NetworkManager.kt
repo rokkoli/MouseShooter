@@ -141,12 +141,13 @@ class NetworkManager {
         }
     }
 
-    fun sendGameStart(numPlayers: Int) {
+    fun sendGameStart(numPlayers: Int, seed: Int) {
         connections.forEach { (index, conn) ->
             val msg = js("{}")
             msg.type = JsMessageType.GAME_START
             msg.playerIndex = index
             msg.numPlayers = numPlayers
+            msg.seed = seed
             conn.send(msg)
         }
     }

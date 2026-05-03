@@ -52,9 +52,9 @@ enum class Rarity(val glowColor: Long, val label: String) {
     LEGENDARY(0xFFFFFF00, "Legendär");
 }
 
-fun rarityFromDistance(dist: Float, maxDist: Float): Rarity {
+fun rarityFromDistance(dist: Float, maxDist: Float, random: kotlin.random.Random = kotlin.random.Random): Rarity {
     // Wunsch: Seltene Waffen können überall spawnen, auch innen
-    val r = kotlin.random.Random.nextFloat()
+    val r = random.nextFloat()
     return when {
         r < 0.45f -> Rarity.COMMON
         r < 0.70f -> Rarity.UNCOMMON

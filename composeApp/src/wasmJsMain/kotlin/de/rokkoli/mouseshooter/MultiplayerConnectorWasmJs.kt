@@ -24,7 +24,7 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
         get() = if (network.isGuest) 2 else network.numConnections + 1
 
     private var stateCallback: ((LobbyConnectionState) -> Unit)? = null
-    private var gameStartCallback: ((Int, Int) -> Unit)? = null
+    private var gameStartCallback: ((Int, Int, Int) -> Unit)? = null
     private var playerInputCallback: ((Int, PlayerInputData) -> Unit)? = null
     private var gameSyncCallback: ((GameSyncData) -> Unit)? = null
     private var gameOverCallback: ((Int) -> Unit)? = null
@@ -49,7 +49,8 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                 WasmMessageType.GAME_START -> {
                     val idx = getJsInt(dataAny, "playerIndex")
                     val numPlayers = getJsInt(dataAny, "numPlayers")
-                    gameStartCallback?.invoke(idx, numPlayers)
+                    val seed = getJsInt(dataAny, "seed")
+                    gameStartCallback?.invoke(idx, numPlayers, seed)
                 }
                 WasmMessageType.PLAYER_INPUT -> {
                     val idx = getJsInt(dataAny, "playerIndex")
@@ -158,14 +159,14 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
     }
 
     override fun onStateChanged(callback: (LobbyConnectionState) -> Unit) { stateCallback = callback }
-    override fun onGameStartReceived(callback: (playerIndex: Int, numPlayers: Int) -> Unit) { gameStartCallback = callback }
+    override fun onGameStartReceived(callback: (playerIndex: Int, numPlayers: Int, seed: Int) -> Unit) { gameStartCallback = callback }
     override fun onPlayerInputReceived(callback: (playerIndex: Int, data: PlayerInputData) -> Unit) { playerInputCallback = callback }
     override fun onGameSyncReceived(callback: (GameSyncData) -> Unit) { gameSyncCallback = callback }
     override fun onGameOverReceived(callback: (winnerId: Int) -> Unit) { gameOverCallback = callback }
     override fun onShootReceived(callback: (playerIndex: Int) -> Unit) { shootCallback = callback }
     override fun onPickupReceived(callback: (playerIndex: Int) -> Unit) { pickupCallback = callback }
 
-    override fun sendGameStart(numPlayers: Int) { network.sendGameStart(numPlayers) }
+    override fun sendGameStart(numPlayers: Int, seed: Int) { network.sendGameStart(numPlayers, seed) }
     override fun sendPlayerInput(playerIndex: Int, data: PlayerInputData) { network.sendPlayerInput(playerIndex, data) }
     override fun sendGameSync(data: GameSyncData) {
         network.sendGameSync(data.players, data.projectiles, data.gameTime, data.battleZoneRadius, data.isGameOver, data.winnerId, data.killFeed)

@@ -50,6 +50,7 @@ fun MultiplayerGameScreen(
     var gameState by remember { mutableStateOf<GameState?>(null) }
     var gameStarted by remember { mutableStateOf(false) }
     var connectionLost by remember { mutableStateOf(false) }
+    var gameSeed by remember { mutableStateOf(0) }
 
     var mousePos    by remember { mutableStateOf(Vec2(400f, 300f)) }
     var isRightDown by remember { mutableStateOf(false) }
@@ -66,8 +67,10 @@ fun MultiplayerGameScreen(
     LaunchedEffect(Unit) {
         if (isHost) {
             val numPlayers = connector.connectedPlayers
-            gameState = createMultiplayerInitialState(numPlayers)
-            connector.sendGameStart(numPlayers)
+            val seed = kotlin.random.Random.nextInt()
+            gameSeed = seed
+            gameState = createMultiplayerInitialState(numPlayers, seed)
+            connector.sendGameStart(numPlayers, seed)
             gameStarted = true
         }
     }
@@ -80,11 +83,12 @@ fun MultiplayerGameScreen(
             }
         }
 
-        connector.onGameStartReceived { playerIndex, numPlayers ->
+        connector.onGameStartReceived { playerIndex, numPlayers, seed ->
             if (!isHost) {
                 myPlayerIndex = playerIndex
+                gameSeed = seed
                 // Erstelle lokalen Platzhalter-State bis erster Sync kommt
-                gameState = createMultiplayerInitialState(numPlayers)
+                gameState = createMultiplayerInitialState(numPlayers, seed)
                 gameStarted = true
             }
         }
@@ -124,7 +128,7 @@ fun MultiplayerGameScreen(
 
         connector.onGameSyncReceived { syncData ->
             if (!isHost) {
-                gameState = applyGameSync(gameState, syncData)
+                gameState = applyGameSync(gameState, syncData, gameSeed)
             }
         }
 
@@ -426,11 +430,11 @@ fun MultiplayerGameScreen(
 // ---------------------------------------------------------------------------
 
 /** Erzeugt den Multiplayer-Startzustand: Alle Spieler sind echte Spieler, keine Bots. */
-fun createMultiplayerInitialState(numPlayers: Int): GameState {
+fun createMultiplayerInitialState(numPlayers: Int, seed: Int): GameState {
     val mapW = 5500f
     val mapH = 5500f
     val center = Vec2(mapW / 2, mapH / 2)
-    val (obstacles, items) = MapGenerator.generate(mapW, mapH)
+    val (obstacles, items) = MapGenerator.generate(mapW, mapH, kotlin.random.Random(seed))
 
     val players = mutableListOf<Player>()
 
@@ -506,8 +510,8 @@ fun createGameSyncData(state: GameState): GameSyncData {
 }
 
 /** Wendet GameSyncData auf den lokalen State an. */
-fun applyGameSync(currentState: GameState?, syncData: GameSyncData): GameState {
-    val base = currentState ?: createMultiplayerInitialState(syncData.players.size)
+fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): GameState {
+    val base = currentState ?: createMultiplayerInitialState(syncData.players.size, seed)
 
     val updatedPlayers = syncData.players.map { sp ->
         val existing = base.players.firstOrNull { it.id == sp.id }

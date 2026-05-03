@@ -43,7 +43,7 @@ abstract class MultiplayerConnector {
     // Game message callbacks (set by the game composable)
     // -----------------------------------------------------------------------
 
-    abstract fun onGameStartReceived(callback: (playerIndex: Int, numPlayers: Int) -> Unit)
+    abstract fun onGameStartReceived(callback: (playerIndex: Int, numPlayers: Int, seed: Int) -> Unit)
     abstract fun onPlayerInputReceived(callback: (playerIndex: Int, data: PlayerInputData) -> Unit)
     abstract fun onGameSyncReceived(callback: (GameSyncData) -> Unit)
     abstract fun onGameOverReceived(callback: (winnerId: Int) -> Unit)
@@ -54,7 +54,7 @@ abstract class MultiplayerConnector {
     // Send typed messages
     // -----------------------------------------------------------------------
 
-    abstract fun sendGameStart(numPlayers: Int)
+    abstract fun sendGameStart(numPlayers: Int, seed: Int)
     abstract fun sendPlayerInput(playerIndex: Int, data: PlayerInputData)
     abstract fun sendGameSync(data: GameSyncData)
     abstract fun sendGameOver(winnerId: Int)

@@ -204,12 +204,13 @@ class WasmJsNetworkManager {
         }
     }
 
-    fun sendGameStart(numPlayers: Int) {
+    fun sendGameStart(numPlayers: Int, seed: Int) {
         connections.forEach { (index, conn) ->
             val msg = createJsObject()
             setJsString(msg, "type", WasmMessageType.GAME_START)
             setJsInt(msg, "playerIndex", index)
             setJsInt(msg, "numPlayers", numPlayers)
+            setJsInt(msg, "seed", seed)
             conn.send(msg)
         }
     }

@@ -11,7 +11,7 @@ const val MIN_WEAPON_SPAWN_DIST = 1400f
 
 // ─── MapGenerator ────────────────────────────────────────────────────────────
 object MapGenerator {
-    fun generate(mapW: Float, mapH: Float): Pair<List<Obstacle>, List<GroundItem>> {
+    fun generate(mapW: Float, mapH: Float, random: kotlin.random.Random = kotlin.random.Random): Pair<List<Obstacle>, List<GroundItem>> {
         val obstacles = mutableListOf<Obstacle>()
         val items = mutableListOf<GroundItem>()
         var idCounter = 0
@@ -33,13 +33,13 @@ object MapGenerator {
                 if (pos.distanceTo(center) < 600f) continue
                 
                 // 30% Chance, Zelle komplett freizulassen
-                if (Random.nextFloat() < 0.3f) continue
+                if (random.nextFloat() < 0.3f) continue
 
-                val choice = Random.nextInt(5)
+                val choice = random.nextInt(5)
                 when (choice) {
                     0 -> { // Einfacher Block (Haus)
-                        val w = Random.nextFloat() * 150f + 100f
-                        val h = Random.nextFloat() * 150f + 100f
+                        val w = random.nextFloat() * 150f + 100f
+                        val h = random.nextFloat() * 150f + 100f
                         obstacles.add(Obstacle(pos, w, h, 0xFF665544L))
                     }
                     1 -> { // L-Wand
@@ -58,7 +58,7 @@ object MapGenerator {
                         obstacles.add(Obstacle(Vec2(pos.x + 60f, pos.y + 60f), 40f, 40f, 0xFF554444L))
                     }
                     4 -> { // Lange Mauer horizontal oder vertikal
-                        if (Random.nextBoolean()) {
+                        if (random.nextBoolean()) {
                             obstacles.add(Obstacle(pos, 400f, 16f, 0xFFAABBCCL))
                         } else {
                             obstacles.add(Obstacle(pos, 16f, 400f, 0xFFAABBCCL))
@@ -72,55 +72,53 @@ object MapGenerator {
 
         // Waffen: 25 Stück, min. MIN_WEAPON_SPAWN_DIST vom Zentrum
         repeat(25) {
-            val angle = Random.nextFloat() * 2 * PI.toFloat()
-            val dist  = MIN_WEAPON_SPAWN_DIST + Random.nextFloat() * (maxDist * 0.88f - MIN_WEAPON_SPAWN_DIST)
+            val angle = random.nextFloat() * 2 * PI.toFloat()
+            val dist  = MIN_WEAPON_SPAWN_DIST + random.nextFloat() * (maxDist * 0.88f - MIN_WEAPON_SPAWN_DIST)
             val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
-            val rarity = rarityFromDistance(dist, maxDist)
+            val rarity = rarityFromDistance(dist, maxDist, random)
             val pool = if (rarity.ordinal >= Rarity.EPIC.ordinal)
                 listOf(WeaponType.SMG, WeaponType.FLAMETHROWER, WeaponType.ROCKET_LAUNCHER, WeaponType.SHOTGUN, WeaponType.SNIPER, WeaponType.MINIGUN)
             else if (rarity.ordinal >= Rarity.RARE.ordinal)
                 listOf(WeaponType.SMG, WeaponType.SHOTGUN)
             else listOf(WeaponType.PISTOL, WeaponType.KNIFE, WeaponType.LONG_KNIFE, WeaponType.SHOTGUN)
-            items.add(GroundItem.WeaponItem(idCounter++, pos, pool.random(), rarity))
+            items.add(GroundItem.WeaponItem(idCounter++, pos, pool.random(random), rarity))
         }
 
         // Granaten: 8 Stück
         repeat(8) {
-            val angle = Random.nextFloat() * 2 * PI.toFloat()
-            val dist  = 900f + Random.nextFloat() * (maxDist * 0.85f - 900f)
+            val angle = random.nextFloat() * 2 * PI.toFloat()
+            val dist  = 900f + random.nextFloat() * (maxDist * 0.85f - 900f)
             val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
-            items.add(GroundItem.GrenadeItem(idCounter++, pos, GrenadeType.values().random(), rarityFromDistance(dist, maxDist)))
+            items.add(GroundItem.GrenadeItem(idCounter++, pos, GrenadeType.values().random(random), rarityFromDistance(dist, maxDist, random)))
         }
 
         // Rüstungen: 5 Stück
         repeat(5) {
-            val angle = Random.nextFloat() * 2 * PI.toFloat()
-            val dist  = MIN_WEAPON_SPAWN_DIST + Random.nextFloat() * (maxDist * 0.8f - MIN_WEAPON_SPAWN_DIST)
+            val angle = random.nextFloat() * 2 * PI.toFloat()
+            val dist  = MIN_WEAPON_SPAWN_DIST + random.nextFloat() * (maxDist * 0.8f - MIN_WEAPON_SPAWN_DIST)
             val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
-            items.add(GroundItem.ArmorItem(idCounter++, pos, ArmorType.values().random(), rarityFromDistance(dist, maxDist)))
+            items.add(GroundItem.ArmorItem(idCounter++, pos, ArmorType.values().random(random), rarityFromDistance(dist, maxDist, random)))
         }
 
         // Nahkampf-Waffen etwas näher – für frühe Engagement
         for (i in 0..2) {
             val a = i * (2 * PI.toFloat() / 3)
-            val d = 700f + Random.nextFloat() * 400f
+            val d = 700f + random.nextFloat() * 400f
             val pos = Vec2(center.x + cos(a) * d, center.y + sin(a) * d).clampToMap(mapW, mapH)
             items.add(GroundItem.WeaponItem(idCounter++, pos,
-                listOf(WeaponType.KNIFE, WeaponType.LONG_KNIFE, WeaponType.BOXING_GLOVES).random(), Rarity.COMMON))
+                listOf(WeaponType.KNIFE, WeaponType.LONG_KNIFE, WeaponType.BOXING_GLOVES).random(random), Rarity.COMMON))
         }
 
         // Medkits: 12 Stück als Granaten
         repeat(12) {
-            val angle = Random.nextFloat() * 2 * PI.toFloat()
-            val dist  = 600f + Random.nextFloat() * (maxDist * 0.9f - 600f)
+            val angle = random.nextFloat() * 2 * PI.toFloat()
+            val dist  = 600f + random.nextFloat() * (maxDist * 0.9f - 600f)
             val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
-            items.add(GroundItem.GrenadeItem(idCounter++, pos, GrenadeType.MEDKIT, rarityFromDistance(dist, maxDist)))
+            items.add(GroundItem.GrenadeItem(idCounter++, pos, GrenadeType.MEDKIT, rarityFromDistance(dist, maxDist, random)))
         }
 
         return Pair(obstacles, items)
     }
-
-    
 }
 
 fun Vec2.clampToMap(w: Float, h: Float) = Vec2(x.coerceIn(50f, w - 50f), y.coerceIn(50f, h - 50f))
