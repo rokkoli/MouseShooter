@@ -224,7 +224,8 @@ data class Player(
     val spreadAngle: Float = 0f,   // eindeutige Streurichtung beim Spawn
     val hasDroppedLoot: Boolean = false,
     val lastDamagedBy: Int = -1,
-    val lastMeleeLeft: Boolean = false
+    val lastMeleeLeft: Boolean = false,
+    val isMovingIntent: Boolean = false, // Neu für Multiplayer-Bewegung
 )
 
 // ─── Projektile ──────────────────────────────────────────────────────────────

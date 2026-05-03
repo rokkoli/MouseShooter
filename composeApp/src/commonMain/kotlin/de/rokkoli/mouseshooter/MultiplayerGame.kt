@@ -101,6 +101,7 @@ fun MultiplayerGameScreen(
                     if (p.id == playerIndex) {
                         p.copy(
                             rotation = inputData.rotation,
+                            isMovingIntent = inputData.isMoving
                         )
                     } else p
                 })
@@ -155,13 +156,18 @@ fun MultiplayerGameScreen(
                     val zoom = gs.zoomLevel
                     val screenCenter = Vec2(screenSize.x / 2, screenSize.y / 2)
 
-                    // Lokaler Host-Spieler Input
+                    // Lokaler Host-Spieler Input (Markiere P0 als Lokal für Engine!)
                     val localPlayer = gs.players.firstOrNull { it.id == 0 && it.isAlive }
                     if (localPlayer != null && !localPlayer.isSpawning) {
                         val toMouse = (mousePos - screenCenter) * (1f / zoom)
                         val rotation = atan2(toMouse.y, toMouse.x)
                         gameState = gs.copy(players = gs.players.map {
-                            if (it.id == 0 && it.isAlive) it.copy(rotation = rotation) else it
+                            if (it.id == 0 && it.isAlive) {
+                                it.copy(rotation = rotation, isLocalPlayer = true, isMovingIntent = !isRightDown)
+                            } else {
+                                // WICHTIG: Host muss alle anderen Spieler als Remote lassen
+                                it.copy(isLocalPlayer = false)
+                            }
                         })
                     }
 
@@ -176,11 +182,12 @@ fun MultiplayerGameScreen(
                     }
                     wasLeftDown = isLeftDown
 
-                    // Remote-Spieler Bewegung basierend auf gespeicherter Rotation
+                    // Remote-Spieler Bewegung basierend auf Intent
                     var updatedState = gameState!!
                     updatedState = updatedState.copy(players = updatedState.players.map { p ->
                         if (p.id == 0 || !p.isAlive || p.isSpawning) return@map p
-                        // Remote-Player laufen in ihre Blickrichtung
+                        if (!p.isMovingIntent) return@map p.copy(velocity = Vec2(0f, 0f))
+
                         val dir = Vec2(kotlin.math.cos(p.rotation), kotlin.math.sin(p.rotation))
                         val vel = dir * PLAYER_SPEED
                         var newPos = p.pos + vel * dt
@@ -230,13 +237,26 @@ fun MultiplayerGameScreen(
                     }
                     wasLeftDown = isLeftDown
 
-                    // Lokale Rotation updaten
-                    gameState = gs.copy(players = gs.players.map {
-                        if (it.id == myPlayerIndex && it.isAlive) it.copy(rotation = rotation) else it
+                    // Guest: Lokale Simulation (Prediction) für flüssiges Laufen
+                    gameState = gs.copy(players = gs.players.map { p ->
+                        if (p.id == myPlayerIndex && p.isAlive && !p.isSpawning) {
+                            var pCopy = p.copy(rotation = rotation)
+                            if (!isRightDown) {
+                                val dir = Vec2(kotlin.math.cos(rotation), kotlin.math.sin(rotation))
+                                val vel = dir * PLAYER_SPEED
+                                var newPos = pCopy.pos + vel * dt
+                                newPos = GameEngine.resolveObstacleCollision(newPos, gs.obstacles, PLAYER_RADIUS)
+                                newPos = newPos.clampToMap(gs.mapWidth, gs.mapHeight)
+                                pCopy = pCopy.copy(pos = newPos, velocity = vel)
+                            } else {
+                                pCopy = pCopy.copy(velocity = Vec2(0f, 0f))
+                            }
+                            pCopy
+                        } else p
                     })
 
-                    // Kamera
-                    val localP = gameState!!.players.firstOrNull { it.id == myPlayerIndex && it.isAlive }
+                    // Kamera auf Predicted Position
+                    val localP = gameState!!.players.firstOrNull { it.id == myPlayerIndex }
                     if (localP != null) {
                         gameState = gameState!!.copy(cameraX = localP.pos.x, cameraY = localP.pos.y)
                     }
@@ -256,7 +276,20 @@ fun MultiplayerGameScreen(
             .fillMaxSize()
             .background(Color.Black)
             .focusRequester(focusRequester)
-            .focusable()
+            // ── Keyboard-Events ──────────────────────────────────────────
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    if (keyEvent.key == Key.E) {
+                        if (isHost) {
+                            gameState = gameState?.let { GameEngine.pickupNearby(it, myPlayerIndex) }
+                        } else {
+                            connector.sendPickup(myPlayerIndex)
+                        }
+                        return@onKeyEvent true
+                    }
+                }
+                false
+            }
             // ── Maus-Tracking ─────────────────────────────────────────────
             .pointerInput(Unit) {
                 awaitPointerEventScope {

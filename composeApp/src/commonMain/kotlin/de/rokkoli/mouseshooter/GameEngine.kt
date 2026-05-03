@@ -264,10 +264,10 @@ object GameEngine {
     // ── Lokaler Spieler ───────────────────────────────────────────────────────
     private fun updatePlayers(state: GameState, dt: Float, mousePos: Vec2, isRightMouseDown: Boolean, viewport: Vec2): GameState {
         val updated = state.players.map { player ->
-            if (!player.isLocalPlayer || !player.isAlive) return@map player
+            if (!player.isAlive) return@map player
             var p = player
 
-            // Statuseffekte ticken
+            // ── Statuseffekte & Cooldowns ticken (FÜR ALLE SPIELER!) ──────────
             val se = p.statusEffects
             val newSe = se.copy(
                 stunTimer      = (se.stunTimer      - dt).coerceAtLeast(0f),
@@ -279,6 +279,7 @@ object GameEngine {
             )
             p = p.copy(statusEffects = newSe, fireCooldown = (p.fireCooldown - dt).coerceAtLeast(0f))
 
+            if (!p.isLocalPlayer) return@map p // Nur lokaler Spieler verarbeitet Maus/Keyboard hier
             if (newSe.stunTimer > 0f) return@map p  // Stun: kein Input
 
             // Mausrichtung (zoom-korrigiert)
@@ -491,7 +492,7 @@ object GameEngine {
                 slowTimer    = (bot.statusEffects.slowTimer    - dt).coerceAtLeast(0f),
                 dashCooldown = (bot.statusEffects.dashCooldown - dt).coerceAtLeast(0f)
             )
-            bot = bot.copy(statusEffects = se, fireCooldown = (bot.fireCooldown - dt).coerceAtLeast(0f), wanderTimer = (bot.wanderTimer - dt).coerceAtLeast(0f))
+            bot = bot.copy(statusEffects = se, wanderTimer = (bot.wanderTimer - dt).coerceAtLeast(0f))
             if (se.stunTimer > 0f) { players[i] = bot; continue }
 
             // ── Separation: weg von anderen Bots ──────────────────────────────
