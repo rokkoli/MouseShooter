@@ -25,23 +25,45 @@ import kotlinx.coroutines.isActive
 import kotlin.math.atan2
 
 // ─── Spielbildschirme ─────────────────────────────────────────────────────────
-enum class Screen { MENU, GAME }
-enum class GameMode { SINGLEPLAYER, MULTIPLAYER }
+sealed class Screen {
+    data object Menu : Screen()
+    data object Singleplayer : Screen()
+    data object MultiplayerLobbyScreen : Screen()
+    data class MultiplayerGameScr(
+        val connector: MultiplayerConnector,
+        val isHost: Boolean,
+    ) : Screen()
+}
 
 // ─── Haupt-App ────────────────────────────────────────────────────────────────
 @Composable
 fun App() {
-    var screen by remember { mutableStateOf(Screen.MENU) }
-    var gameMode by remember { mutableStateOf(GameMode.SINGLEPLAYER) }
+    var screen by remember { mutableStateOf<Screen>(Screen.Menu) }
 
-    when (screen) {
-        Screen.MENU -> MainMenu(
-            onStartSingleplayer = { gameMode = GameMode.SINGLEPLAYER; screen = Screen.GAME },
-            onStartMultiplayer = { gameMode = GameMode.MULTIPLAYER; screen = Screen.GAME }
+    when (val s = screen) {
+        is Screen.Menu -> MainMenu(
+            onStartSingleplayer = { screen = Screen.Singleplayer },
+            onStartMultiplayer = { screen = Screen.MultiplayerLobbyScreen }
         )
-        Screen.GAME -> GameScreen(mode = gameMode, onRestart = { screen = Screen.MENU })
+        is Screen.Singleplayer -> GameScreen(
+            mode = GameMode.SINGLEPLAYER,
+            onRestart = { screen = Screen.Menu }
+        )
+        is Screen.MultiplayerLobbyScreen -> MultiplayerLobby(
+            onBack = { screen = Screen.Menu },
+            onGameReady = { connector, isHost ->
+                screen = Screen.MultiplayerGameScr(connector, isHost)
+            }
+        )
+        is Screen.MultiplayerGameScr -> MultiplayerGameScreen(
+            connector = s.connector,
+            isHost = s.isHost,
+            onBack = { screen = Screen.Menu }
+        )
     }
 }
+
+enum class GameMode { SINGLEPLAYER, MULTIPLAYER }
 
 // ─── Spielbildschirm ──────────────────────────────────────────────────────────
 @OptIn(ExperimentalComposeUiApi::class)
@@ -186,16 +208,6 @@ fun GameScreen(mode: GameMode, onRestart: () -> Unit) {
             val spawningPlayer = localPlayer
             if (spawningPlayer?.isSpawning == true) {
                 SpawnCountdown(spawningPlayer.spawnTimer)
-            }
-        }
-
-        // ── Game-Over / Multiplayer Overlay ───────────────────────────────────────────
-        if (mode == GameMode.MULTIPLAYER && !gameState.isGameOver) {
-            Box(
-                modifier = Modifier.padding(16.dp).align(Alignment.TopCenter)
-                    .background(Color(0x88000000), RoundedCornerShape(8.dp)).padding(12.dp)
-            ) {
-                Text("MULTIPLAYER MOCK\n(Local Bot-Game until Network is active)", color = Color.White, textAlign = TextAlign.Center)
             }
         }
 

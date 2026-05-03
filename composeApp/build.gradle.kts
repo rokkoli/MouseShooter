@@ -41,6 +41,12 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
         }
+        jsMain.dependencies {
+            implementation(npm("peerjs", "1.5.5"))
+        }
+        wasmJsMain.dependencies {
+            implementation(npm("peerjs", "1.5.5"))
+        }
     }
 }
 
