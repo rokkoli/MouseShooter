@@ -147,7 +147,7 @@ fun createInitialState(): GameState {
         val spawnDist = 55f + i * 12f
         val botPos = Vec2(center.x + cos(spreadAngle) * spawnDist, center.y + sin(spreadAngle) * spawnDist)
         players.add(Player(
-            id = i, pos = botPos, hp = 100f, isLocalPlayer = false,
+            id = i, pos = botPos, hp = 100f, isLocalPlayer = false, isBot = true,
             inventory = Inventory(meleeSlot = WeaponType.FISTS, gunSlots = listOf(null, null, null), selectedSlotIndex = 0),
             color = botColors[(i - 1) % botColors.size],
             isSpawning = true, spawnTimer = 3.5f + i * 0.1f,
@@ -478,7 +478,7 @@ object GameEngine {
 
         for (i in players.indices) {
             var bot = players[i]
-            if (bot.isLocalPlayer || !bot.isAlive) continue
+            if (bot.isLocalPlayer || !bot.isAlive || !bot.isBot) continue
             if (bot.isSpawning) {
                 // Während Spawn: in Streurichtung laufen
                 val dir = Vec2(cos(bot.spreadAngle), sin(bot.spreadAngle))

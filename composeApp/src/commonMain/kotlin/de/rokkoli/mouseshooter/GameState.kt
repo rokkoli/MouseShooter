@@ -210,6 +210,7 @@ data class Player(
     val inventory: Inventory = Inventory(),
     val fireCooldown: Float = 0f,
     val isLocalPlayer: Boolean = false,
+    val isBot: Boolean = false,
     val statusEffects: StatusEffects = StatusEffects(),
     val isAlive: Boolean = true,
     val color: Long = 0xFF00AAFF,

@@ -452,26 +452,6 @@ fun createMultiplayerInitialState(numPlayers: Int): GameState {
         ))
     }
 
-    // Füge Bots hinzu um die Map zu füllen
-    val botColors = listOf(0xFFFF8800L, 0xFFFF00AAL, 0xFF00FF88L, 0xFFAA00FFL)
-    for (i in numPlayers until numPlayers + 4) {
-        val spreadAngle = (i.toFloat() / (numPlayers + 4)) * 2 * kotlin.math.PI.toFloat()
-        val spawnDist = 80f + i * 15f
-        val pos = Vec2(center.x + kotlin.math.cos(spreadAngle) * spawnDist, center.y + kotlin.math.sin(spreadAngle) * spawnDist)
-        players.add(Player(
-            id = i,
-            pos = pos,
-            hp = 100f,
-            isLocalPlayer = false,
-            inventory = Inventory(meleeSlot = WeaponType.FISTS, gunSlots = listOf(null, null, null), selectedSlotIndex = 0),
-            color = botColors[(i - numPlayers) % botColors.size],
-            isSpawning = true,
-            spawnTimer = 3.5f + i * 0.1f,
-            spreadAngle = spreadAngle,
-            wanderAngle = spreadAngle,
-        ))
-    }
-
     return GameState(
         players = players, groundItems = items, obstacles = obstacles,
         battleZone = BattleZone(3000f, 150f, center.x, center.y, shrinkRate = 4f),
