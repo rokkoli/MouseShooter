@@ -229,6 +229,9 @@ class WasmJsNetworkManager {
     }
 
     fun sendGameSync(players: List<PlayerSyncData>, projectiles: List<ProjectileSyncData>,
+                     meleeSwings: List<MeleeSwingSyncData>, explosions: List<ExplosionSyncData>,
+                     grenades: List<GrenadeSyncData>,
+                     groundItems: List<GroundItemSyncData>, effectZones: List<EffectZoneSyncData>,
                      gameTime: Float, battleZoneRadius: Float, isGameOver: Boolean, winnerId: Int,
                      killFeed: List<String>) {
         val msg = createJsObject()
@@ -272,6 +275,70 @@ class WasmJsNetworkManager {
             pushJsArray(projArr, pObj)
         }
         setJsAny(msg, "projectiles", projArr)
+
+        val msArr = createJsArray()
+        meleeSwings.forEach { ms ->
+            val msObj = createJsObject()
+            setJsInt(msObj, "ownerId", ms.ownerId)
+            setJsFloat(msObj, "x", ms.x)
+            setJsFloat(msObj, "y", ms.y)
+            setJsFloat(msObj, "dirX", ms.dirX)
+            setJsFloat(msObj, "dirY", ms.dirY)
+            setJsFloat(msObj, "range", ms.range)
+            setJsString(msObj, "weaponLabel", ms.weaponLabel)
+            setJsBoolean(msObj, "isLeft", ms.isLeft)
+            pushJsArray(msArr, msObj)
+        }
+        setJsAny(msg, "meleeSwings", msArr)
+
+        val expArr = createJsArray()
+        explosions.forEach { exp ->
+            val eObj = createJsObject()
+            setJsFloat(eObj, "x", exp.x)
+            setJsFloat(eObj, "y", exp.y)
+            setJsFloat(eObj, "currentRadius", exp.currentRadius)
+            setJsFloat(eObj, "maxRadius", exp.maxRadius)
+            pushJsArray(expArr, eObj)
+        }
+        setJsAny(msg, "explosions", expArr)
+
+        val gArr = createJsArray()
+        grenades.forEach { g ->
+            val gObj = createJsObject()
+            setJsInt(gObj, "id", g.id)
+            setJsInt(gObj, "ownerId", g.ownerId)
+            setJsFloat(gObj, "x", g.pos.x)
+            setJsFloat(gObj, "y", g.pos.y)
+            setJsFloat(gObj, "color", g.color.toFloat())
+            pushJsArray(gArr, gObj)
+        }
+        setJsAny(msg, "grenades", gArr)
+
+        val giArr = createJsArray()
+        groundItems.forEach { gi ->
+            val iObj = createJsObject()
+            setJsInt(iObj, "id", gi.id)
+            setJsInt(iObj, "type", gi.type)
+            setJsFloat(iObj, "x", gi.x)
+            setJsFloat(iObj, "y", gi.y)
+            setJsString(iObj, "itemType", gi.itemType)
+            setJsInt(iObj, "rarity", gi.rarity)
+            pushJsArray(giArr, iObj)
+        }
+        setJsAny(msg, "groundItems", giArr)
+
+        val ezArr = createJsArray()
+        effectZones.forEach { ez ->
+            val zObj = createJsObject()
+            setJsInt(zObj, "id", ez.id)
+            setJsFloat(zObj, "x", ez.x)
+            setJsFloat(zObj, "y", ez.y)
+            setJsFloat(zObj, "radius", ez.radius)
+            setJsInt(zObj, "type", ez.type)
+            setJsFloat(zObj, "color", ez.color.toFloat())
+            pushJsArray(ezArr, zObj)
+        }
+        setJsAny(msg, "effectZones", ezArr)
 
         setJsFloat(msg, "gameTime", gameTime)
         setJsFloat(msg, "battleZoneRadius", battleZoneRadius)

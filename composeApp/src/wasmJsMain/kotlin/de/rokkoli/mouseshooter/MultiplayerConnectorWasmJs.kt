@@ -106,6 +106,74 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                             explosionRadius = getJsFloat(pObj, "explosionRadius"),
                         ))
                     }
+                    val msArr = getJsArray(dataAny, "meleeSwings")
+                    val msLen = getJsArrayLength(msArr)
+                    val meleeSwings = mutableListOf<MeleeSwingSyncData>()
+                    for (i in 0 until msLen) {
+                        val mObj = getJsArrayItem(msArr, i)
+                        meleeSwings.add(MeleeSwingSyncData(
+                            ownerId = getJsInt(mObj, "ownerId"),
+                            x = getJsFloat(mObj, "x"),
+                            y = getJsFloat(mObj, "y"),
+                            dirX = getJsFloat(mObj, "dirX"),
+                            dirY = getJsFloat(mObj, "dirY"),
+                            range = getJsFloat(mObj, "range"),
+                            weaponLabel = getJsString(mObj, "weaponLabel") ?: "",
+                            isLeft = getJsBoolean(mObj, "isLeft"),
+                        ))
+                    }
+                    val expArr = getJsArray(dataAny, "explosions")
+                    val expLen = getJsArrayLength(expArr)
+                    val explosions = mutableListOf<ExplosionSyncData>()
+                    for (i in 0 until expLen) {
+                        val eObj = getJsArrayItem(expArr, i)
+                        explosions.add(ExplosionSyncData(
+                            x = getJsFloat(eObj, "x"),
+                            y = getJsFloat(eObj, "y"),
+                            currentRadius = getJsFloat(eObj, "currentRadius"),
+                            maxRadius = getJsFloat(eObj, "maxRadius"),
+                        ))
+                    }
+                    val gArr = getJsArray(dataAny, "grenades")
+                    val gLen = getJsArrayLength(gArr)
+                    val grenades = mutableListOf<GrenadeSyncData>()
+                    for (i in 0 until gLen) {
+                        val gObj = getJsArrayItem(gArr, i)
+                        grenades.add(GrenadeSyncData(
+                            id = getJsInt(gObj, "id"),
+                            ownerId = getJsInt(gObj, "ownerId"),
+                            pos = Vec2(getJsFloat(gObj, "x"), getJsFloat(gObj, "y")),
+                            color = getJsFloat(gObj, "color").toLong(),
+                        ))
+                    }
+                    val giArr = getJsArray(dataAny, "groundItems")
+                    val giLen = getJsArrayLength(giArr)
+                    val groundItems = mutableListOf<GroundItemSyncData>()
+                    for (i in 0 until giLen) {
+                        val iObj = getJsArrayItem(giArr, i)
+                        groundItems.add(GroundItemSyncData(
+                            id = getJsInt(iObj, "id"),
+                            type = getJsInt(iObj, "type"),
+                            x = getJsFloat(iObj, "x"),
+                            y = getJsFloat(iObj, "y"),
+                            itemType = getJsString(iObj, "itemType") ?: "",
+                            rarity = getJsInt(iObj, "rarity"),
+                        ))
+                    }
+                    val ezArr = getJsArray(dataAny, "effectZones")
+                    val ezLen = getJsArrayLength(ezArr)
+                    val effectZones = mutableListOf<EffectZoneSyncData>()
+                    for (i in 0 until ezLen) {
+                        val zObj = getJsArrayItem(ezArr, i)
+                        effectZones.add(EffectZoneSyncData(
+                            id = getJsInt(zObj, "id"),
+                            x = getJsFloat(zObj, "x"),
+                            y = getJsFloat(zObj, "y"),
+                            radius = getJsFloat(zObj, "radius"),
+                            type = getJsInt(zObj, "type"),
+                            color = getJsFloat(zObj, "color").toLong(),
+                        ))
+                    }
                     val killFeedArr = getJsArray(dataAny, "killFeed")
                     val killFeedLen = getJsArrayLength(killFeedArr)
                     val killFeed = mutableListOf<String>()
@@ -118,6 +186,11 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                     gameSyncCallback?.invoke(GameSyncData(
                         players = players,
                         projectiles = projectiles,
+                        meleeSwings = meleeSwings,
+                        explosions = explosions,
+                        grenades = grenades,
+                        groundItems = groundItems,
+                        effectZones = effectZones,
                         gameTime = getJsFloat(dataAny, "gameTime"),
                         battleZoneRadius = getJsFloat(dataAny, "battleZoneRadius"),
                         isGameOver = getJsBoolean(dataAny, "isGameOver"),
@@ -169,7 +242,7 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
     override fun sendGameStart(numPlayers: Int, seed: Int) { network.sendGameStart(numPlayers, seed) }
     override fun sendPlayerInput(playerIndex: Int, data: PlayerInputData) { network.sendPlayerInput(playerIndex, data) }
     override fun sendGameSync(data: GameSyncData) {
-        network.sendGameSync(data.players, data.projectiles, data.gameTime, data.battleZoneRadius, data.isGameOver, data.winnerId, data.killFeed)
+        network.sendGameSync(data.players, data.projectiles, data.meleeSwings, data.explosions, data.grenades, data.groundItems, data.effectZones, data.gameTime, data.battleZoneRadius, data.isGameOver, data.winnerId, data.killFeed)
     }
     override fun sendGameOver(winnerId: Int) { network.sendGameOver(winnerId) }
     override fun sendShoot(playerIndex: Int) { network.sendShoot(playerIndex) }

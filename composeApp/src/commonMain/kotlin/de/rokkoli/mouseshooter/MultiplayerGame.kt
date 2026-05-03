@@ -534,6 +534,50 @@ fun createGameSyncData(state: GameState): GameSyncData {
                 explosionRadius = proj.explosionRadius,
             )
         },
+        meleeSwings = state.meleeSwings.map { ms ->
+            MeleeSwingSyncData(
+                ownerId = ms.ownerId,
+                x = ms.pos.x,
+                y = ms.pos.y,
+                dirX = ms.direction.x,
+                dirY = ms.direction.y,
+                range = ms.range,
+                weaponLabel = ms.weapon.label,
+                isLeft = ms.isLeft
+            )
+        },
+        explosions = state.explosions.map { exp ->
+            ExplosionSyncData(
+                x = exp.pos.x,
+                y = exp.pos.y,
+                currentRadius = exp.currentRadius,
+                maxRadius = exp.maxRadius
+            )
+        },
+        grenades = state.grenades.map { g ->
+            GrenadeSyncData(
+                id = g.id,
+                ownerId = g.ownerId,
+                pos = g.pos,
+                color = g.grenadeType.color
+            )
+        },
+        groundItems = state.groundItems.map { gi ->
+            val type = when(gi) {
+                is GroundItem.WeaponItem -> 0
+                is GroundItem.GrenadeItem -> 1
+                is GroundItem.ArmorItem -> 2
+            }
+            val label = when(gi) {
+                is GroundItem.WeaponItem -> gi.weaponType.name
+                is GroundItem.GrenadeItem -> gi.grenadeType.name
+                is GroundItem.ArmorItem -> gi.armorType.name
+            }
+            GroundItemSyncData(gi.id, type, gi.pos.x, gi.pos.y, label, gi.rarity.ordinal)
+        },
+        effectZones = state.effectZones.map { ez ->
+            EffectZoneSyncData(ez.id, ez.pos.x, ez.pos.y, ez.radius, ez.type.ordinal, ez.color)
+        },
         gameTime = state.gameTime,
         battleZoneRadius = state.battleZone.currentRadius,
         isGameOver = state.isGameOver,
@@ -577,9 +621,71 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
         )
     }
 
+    val updatedMeleeSwings = syncData.meleeSwings.map { ms ->
+        val weapon = WeaponType.entries.firstOrNull { it.label == ms.weaponLabel } ?: WeaponType.FISTS
+        MeleeSwing(
+            ownerId = ms.ownerId,
+            weapon = weapon,
+            isLeft = ms.isLeft,
+            pos = Vec2(ms.x, ms.y),
+            direction = Vec2(ms.dirX, ms.dirY),
+            range = ms.range,
+            damage = 0f, // Nur für Anzeige, Host berechnet Schaden
+            knockback = 0f,
+        )
+    }
+
+    val updatedExplosions = syncData.explosions.map { exp ->
+        Explosion(
+            pos = Vec2(exp.x, exp.y),
+            maxRadius = exp.maxRadius,
+            currentRadius = exp.currentRadius,
+            timer = 0f, // Wird lokal nicht getickt
+            duration = 0.4f,
+            damage = 0f,
+        )
+    }
+
+    val updatedGrenades = syncData.grenades.map { gs ->
+        ThrownGrenade(
+            id = gs.id,
+            ownerId = gs.ownerId,
+            grenadeType = GrenadeType.entries.firstOrNull { it.color == gs.color } ?: GrenadeType.NORMAL,
+            pos = gs.pos,
+            velocity = Vec2(0f, 0f),
+            timer = 0f,
+        )
+    }
+
+    val updatedGroundItems = syncData.groundItems.map { gi ->
+        val rarity = Rarity.entries.getOrNull(gi.rarity) ?: Rarity.COMMON
+        when(gi.type) {
+            0 -> GroundItem.WeaponItem(gi.id, Vec2(gi.x, gi.y), WeaponType.valueOf(gi.itemType), rarity)
+            1 -> GroundItem.GrenadeItem(gi.id, Vec2(gi.x, gi.y), GrenadeType.valueOf(gi.itemType), rarity)
+            else -> GroundItem.ArmorItem(gi.id, Vec2(gi.x, gi.y), ArmorType.valueOf(gi.itemType), rarity)
+        }
+    }
+
+    val updatedEffectZones = syncData.effectZones.map { ez ->
+        EffectZone(
+            id = ez.id,
+            pos = Vec2(ez.x, ez.y),
+            radius = ez.radius,
+            type = ZoneType.entries.getOrNull(ez.type) ?: ZoneType.SMOKE,
+            timer = 0f,
+            duration = 10f,
+            color = ez.color
+        )
+    }
+
     return base.copy(
         players = updatedPlayers,
         projectiles = updatedProjectiles,
+        meleeSwings = updatedMeleeSwings,
+        explosions = updatedExplosions,
+        grenades = updatedGrenades,
+        groundItems = updatedGroundItems,
+        effectZones = updatedEffectZones,
         gameTime = syncData.gameTime,
         battleZone = base.battleZone.copy(currentRadius = syncData.battleZoneRadius),
         isGameOver = syncData.isGameOver,

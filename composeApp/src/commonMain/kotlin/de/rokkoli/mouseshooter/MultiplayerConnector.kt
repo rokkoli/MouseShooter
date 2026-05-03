@@ -105,10 +105,63 @@ data class ProjectileSyncData(
     val explosionRadius: Float,
 )
 
+/** Grenade sync data. */
+data class GrenadeSyncData(
+    val id: Int,
+    val ownerId: Int,
+    val pos: Vec2,
+    val color: Long,
+)
+
+/** Ground item sync data. */
+data class GroundItemSyncData(
+    val id: Int,
+    val type: Int, // 0=Weapon, 1=Grenade, 2=Armor
+    val x: Float,
+    val y: Float,
+    val itemType: String, // Label or name
+    val rarity: Int,
+)
+
+/** Effect zone sync data. */
+data class EffectZoneSyncData(
+    val id: Int,
+    val x: Float,
+    val y: Float,
+    val radius: Float,
+    val type: Int, // ZoneType ordinal
+    val color: Long,
+)
+
+/** Melee swing sync data. */
+data class MeleeSwingSyncData(
+    val ownerId: Int,
+    val x: Float,
+    val y: Float,
+    val dirX: Float,
+    val dirY: Float,
+    val range: Float,
+    val weaponLabel: String,
+    val isLeft: Boolean,
+)
+
+/** Explosion sync data. */
+data class ExplosionSyncData(
+    val x: Float,
+    val y: Float,
+    val currentRadius: Float,
+    val maxRadius: Float,
+)
+
 /** Flattened game state for network sync (host → guests). */
 data class GameSyncData(
     val players: List<PlayerSyncData>,
     val projectiles: List<ProjectileSyncData> = emptyList(),
+    val meleeSwings: List<MeleeSwingSyncData> = emptyList(),
+    val explosions: List<ExplosionSyncData> = emptyList(),
+    val grenades: List<GrenadeSyncData> = emptyList(),
+    val groundItems: List<GroundItemSyncData> = emptyList(),
+    val effectZones: List<EffectZoneSyncData> = emptyList(),
     val gameTime: Float = 0f,
     val battleZoneRadius: Float = 4000f,
     val isGameOver: Boolean = false,

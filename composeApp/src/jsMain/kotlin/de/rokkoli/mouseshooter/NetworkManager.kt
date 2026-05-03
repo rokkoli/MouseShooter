@@ -203,6 +203,55 @@ class NetworkManager {
         }.toTypedArray()
         msg.gameTime = data.gameTime
         msg.battleZoneRadius = data.battleZoneRadius
+        msg.meleeSwings = data.meleeSwings.map { ms ->
+            val msObj = js("{}")
+            msObj.ownerId = ms.ownerId
+            msObj.x = ms.x
+            msObj.y = ms.y
+            msObj.dirX = ms.dirX
+            msObj.dirY = ms.dirY
+            msObj.range = ms.range
+            msObj.weaponLabel = ms.weaponLabel
+            msObj.isLeft = ms.isLeft
+            msObj
+        }.toTypedArray()
+        msg.explosions = data.explosions.map { exp ->
+            val eObj = js("{}")
+            eObj.x = exp.x
+            eObj.y = exp.y
+            eObj.currentRadius = exp.currentRadius
+            eObj.maxRadius = exp.maxRadius
+            eObj
+        }.toTypedArray()
+        msg.grenades = data.grenades.map { g ->
+            val gObj = js("{}")
+            gObj.id = g.id
+            gObj.ownerId = g.ownerId
+            gObj.x = g.pos.x
+            gObj.y = g.pos.y
+            gObj.color = g.color.toDouble()
+            gObj
+        }.toTypedArray()
+        msg.groundItems = data.groundItems.map { gi ->
+            val iObj = js("{}")
+            iObj.id = gi.id
+            iObj.type = gi.type
+            iObj.x = gi.x
+            iObj.y = gi.y
+            iObj.itemType = gi.itemType
+            iObj.rarity = gi.rarity
+            iObj
+        }.toTypedArray()
+        msg.effectZones = data.effectZones.map { ez ->
+            val zObj = js("{}")
+            zObj.id = ez.id
+            zObj.x = ez.x
+            zObj.y = ez.y
+            zObj.radius = ez.radius
+            zObj.type = ez.type
+            zObj.color = ez.color.toDouble()
+            zObj
+        }.toTypedArray()
         msg.isGameOver = data.isGameOver
         msg.winnerId = data.winnerId
         msg.killFeed = data.killFeed.toTypedArray()

@@ -97,10 +97,69 @@ class JsMultiplayerConnector : MultiplayerConnector() {
                             explosionRadius = (proj.explosionRadius as Number).toFloat(),
                         )
                     } ?: emptyList()
+
+                    val meleeSwings = (data.meleeSwings as? Array<dynamic>)?.map { ms ->
+                        MeleeSwingSyncData(
+                            ownerId = (ms.ownerId as Number).toInt(),
+                            x = (ms.x as Number).toFloat(),
+                            y = (ms.y as Number).toFloat(),
+                            dirX = (ms.dirX as Number).toFloat(),
+                            dirY = (ms.dirY as Number).toFloat(),
+                            range = (ms.range as Number).toFloat(),
+                            weaponLabel = ms.weaponLabel.toString(),
+                            isLeft = ms.isLeft as Boolean
+                        )
+                    } ?: emptyList()
+
+                    val explosions = (data.explosions as? Array<dynamic>)?.map { exp ->
+                        ExplosionSyncData(
+                            x = (exp.x as Number).toFloat(),
+                            y = (exp.y as Number).toFloat(),
+                            currentRadius = (exp.currentRadius as Number).toFloat(),
+                            maxRadius = (exp.maxRadius as Number).toFloat()
+                        )
+                    } ?: emptyList()
+
+                    val grenades = (data.grenades as? Array<dynamic>)?.map { g ->
+                        GrenadeSyncData(
+                            id = (g.id as Number).toInt(),
+                            ownerId = (g.ownerId as Number).toInt(),
+                            pos = Vec2((g.x as Number).toFloat(), (g.y as Number).toFloat()),
+                            color = (g.color as Number).toLong()
+                        )
+                    } ?: emptyList()
+
+                    val groundItems = (data.groundItems as? Array<dynamic>)?.map { gi ->
+                        GroundItemSyncData(
+                            id = (gi.id as Number).toInt(),
+                            type = (gi.type as Number).toInt(),
+                            x = (gi.x as Number).toFloat(),
+                            y = (gi.y as Number).toFloat(),
+                            itemType = gi.itemType.toString(),
+                            rarity = (gi.rarity as Number).toInt()
+                        )
+                    } ?: emptyList()
+
+                    val effectZones = (data.effectZones as? Array<dynamic>)?.map { ez ->
+                        EffectZoneSyncData(
+                            id = (ez.id as Number).toInt(),
+                            x = (ez.x as Number).toFloat(),
+                            y = (ez.y as Number).toFloat(),
+                            radius = (ez.radius as Number).toFloat(),
+                            type = (ez.type as Number).toInt(),
+                            color = (ez.color as Number).toLong()
+                        )
+                    } ?: emptyList()
+
                     val killFeed = (data.killFeed as? Array<dynamic>)?.map { it.toString() } ?: emptyList()
                     gameSyncCallback?.invoke(GameSyncData(
                         players = players,
                         projectiles = projectiles,
+                        meleeSwings = meleeSwings,
+                        explosions = explosions,
+                        grenades = grenades,
+                        groundItems = groundItems,
+                        effectZones = effectZones,
                         gameTime = (data.gameTime as Number).toFloat(),
                         battleZoneRadius = (data.battleZoneRadius as Number).toFloat(),
                         isGameOver = data.isGameOver as Boolean,
