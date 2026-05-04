@@ -97,6 +97,7 @@ private fun TopStatusBar(state: GameState, player: Player, modifier: Modifier) {
         if (se.blindTimer > 0f) HudChip("Geblendet ${se.blindTimer.toInt()}s", Color.White, Icons.Default.Close)
         if (se.invisibleTimer > 0f) HudChip("Unsichtbar ${se.invisibleTimer.toInt()}s", Color(0xFF44CC44), Icons.Default.Face)
         if (se.healRemaining > 0f) HudChip("Heilung läuft", Color(0xFFFF3344), Icons.Default.Favorite)
+        if (player.isReloading) HudChip("LADE NACH...", Color(0xFFFFAA00), Icons.Default.Refresh)
     }
 }
 
@@ -125,6 +126,9 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
         // Rüstung
         add(Pair(inv.armorSlot?.label ?: "—", inv.armorSlot?.color))
     }
+
+    val clipAmmo = inv.clipAmmo
+    val reserveAmmo = inv.reserveAmmo
 
     Row(
         modifier = modifier,
@@ -171,6 +175,21 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
                                 lineHeight = 9.sp,
                                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
                             )
+                            
+                            // Munitions-Anzeige für Schusswaffen
+                            if (index in 1..3) {
+                                val gun = inv.gunSlots[index - 1]
+                                if (gun != null) {
+                                    val current = clipAmmo.getOrNull(index - 1) ?: 0
+                                    val total = reserveAmmo[gun.ammoType] ?: 0
+                                    Text(
+                                        text = "$current / $total",
+                                        color = if (current == 0) Color.Red else Color.White.copy(alpha = 0.8f),
+                                        fontSize = 7.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         }
                     } else {
                         Text("—", color = Color(0xFF555566), fontSize = 14.sp)

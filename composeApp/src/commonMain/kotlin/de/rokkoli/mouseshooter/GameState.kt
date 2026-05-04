@@ -2,6 +2,14 @@ package de.rokkoli.mouseshooter
 
 import kotlin.math.*
 
+enum class AmmoType(val label: String, val color: Long) {
+    LIGHT("Leicht", 0xFFDDDD88),
+    HEAVY("Schwer", 0xFF888844),
+    SHELLS("Schrot", 0xFF884444),
+    ROCKETS("Raketen", 0xFFCC8844),
+    FUEL("Brennstoff", 0xFFFF6600)
+}
+
 // ─── Waffentypen ────────────────────────────────────────────────────────────
 enum class WeaponType(
     val label: String,
@@ -12,19 +20,22 @@ enum class WeaponType(
     val range: Float,
     val color: Long,
     val isMelee: Boolean = false,
-    val knockback: Float = 0f
+    val knockback: Float = 0f,
+    val ammoType: AmmoType? = null,
+    val clipSize: Int = 0,
+    val reloadTime: Float = 0f
 ) {
     FISTS("Fäuste",          2f,  2f,   0f,  0f,  80f, 0xFFFFAAAA, true, 180f),
     KNIFE("Messer",          8f, 4f,   0f,  0f,  70f, 0xFFCCCCCC, true,  70f),
     LONG_KNIFE("Langmesser", 12f, 2.5f, 0f,  0f, 100f, 0xFFAABBCC, true,  90f),
     BOXING_GLOVES("Boxhandschuhe", 3f, 5f, 0f, 0f, 75f, 0xFFFF6600, true, 380f),
-    PISTOL("Pistole",        10f, 2f,  800f, 2.5f, 800f, 0xFFFFDD00),
-    SMG("Maschinengewehr",    7f, 8f,  900f, 2f, 700f, 0xFF00AAFF),
-    SHOTGUN("Schrotflinte",  11f, 1f,  850f, 2f, 450f, 0xFF884444),
-    FLAMETHROWER("Flammenwerfer", 3f, 30f, 300f, 3f, 250f, 0xFFFF4400),
-    ROCKET_LAUNCHER("Raketenwerfer", 35f, 0.5f, 350f, 8f, 900f, 0xFFFF8800),
-    MINIGUN("Minigun", 5f, 14f, 1100f, 2f, 750f, 0xFF4455FF),
-    SNIPER("Sniper", 150f, 0.1f, 4000f, 2f, 10000f, 0xFFFF0033);
+    PISTOL("Pistole",        10f, 2f,  800f, 2.5f, 800f, 0xFFFFDD00, false, 0f, AmmoType.LIGHT, 12, 1.5f),
+    SMG("Maschinengewehr",    7f, 8f,  900f, 2f, 700f, 0xFF00AAFF, false, 0f, AmmoType.LIGHT, 30, 2.0f),
+    SHOTGUN("Schrotflinte",  11f, 1f,  850f, 2f, 450f, 0xFF884444, false, 0f, AmmoType.SHELLS, 8, 2.5f),
+    FLAMETHROWER("Flammenwerfer", 3f, 30f, 300f, 3f, 250f, 0xFFFF4400, false, 0f, AmmoType.FUEL, 100, 3.0f),
+    ROCKET_LAUNCHER("Raketenwerfer", 35f, 0.5f, 350f, 8f, 900f, 0xFFFF8800, false, 0f, AmmoType.ROCKETS, 1, 3.5f),
+    MINIGUN("Minigun", 5f, 14f, 1100f, 2f, 750f, 0xFF4455FF, false, 0f, AmmoType.LIGHT, 100, 5.0f),
+    SNIPER("Sniper", 150f, 0.1f, 4000f, 2f, 10000f, 0xFFFF0033, false, 0f, AmmoType.HEAVY, 5, 4.0f);
 }
 
 enum class GrenadeType(val label: String, val color: Long) {
@@ -119,6 +130,15 @@ sealed class GroundItem(open val id: Int, open val pos: Vec2, open val rarity: R
         override val rarity: Rarity,
         var glowPhase: Float = 0f
     ) : GroundItem(id, pos, rarity)
+
+    data class AmmoItem(
+        override val id: Int,
+        override val pos: Vec2,
+        val ammoType: AmmoType,
+        val amount: Int,
+        override val rarity: Rarity,
+        var glowPhase: Float = 0f
+    ) : GroundItem(id, pos, rarity)
 }
 
 // ─── Statuseffekte ───────────────────────────────────────────────────────────
@@ -141,7 +161,15 @@ data class Inventory(
     val gunSlots: List<WeaponType?> = listOf(WeaponType.PISTOL, null, null),
     val grenadeSlots: List<GrenadeType?> = listOf(null, null),
     val armorSlot: ArmorType? = null,
-    val selectedSlotIndex: Int = 1  // 0=melee, 1-3=guns, 4-5=grenades, 6=armor
+    val selectedSlotIndex: Int = 1,  // 0=melee, 1-3=guns, 4-5=grenades, 6=armor
+    val clipAmmo: List<Int> = listOf(12, 0, 0), // Ammo in Magazin für gunSlots
+    val reserveAmmo: Map<AmmoType, Int> = mapOf(
+        AmmoType.LIGHT to 60,
+        AmmoType.HEAVY to 10,
+        AmmoType.SHELLS to 16,
+        AmmoType.ROCKETS to 2,
+        AmmoType.FUEL to 100
+    )
 ) {
     val activeWeapon: WeaponType? get() = when {
         selectedSlotIndex == 0 -> meleeSlot
@@ -188,9 +216,16 @@ data class Inventory(
     fun addWeapon(w: WeaponType): Inventory {
         if (w.isMelee) return copy(meleeSlot = w)
         val newGuns = gunSlots.toMutableList()
+        val newClip = clipAmmo.toMutableList()
         val freeIdx = newGuns.indexOfFirst { it == null }
-        if (freeIdx >= 0) newGuns[freeIdx] = w else newGuns[0] = w
-        return copy(gunSlots = newGuns)
+        if (freeIdx >= 0) {
+            newGuns[freeIdx] = w
+            newClip[freeIdx] = w.clipSize
+        } else {
+            newGuns[0] = w
+            newClip[0] = w.clipSize
+        }
+        return copy(gunSlots = newGuns, clipAmmo = newClip)
     }
 
     fun addGrenade(g: GrenadeType): Inventory {
@@ -230,6 +265,8 @@ data class Player(
     val lastDamagedBy: Int = -1,
     val lastMeleeLeft: Boolean = false,
     val isMovingIntent: Boolean = false, // Neu für Multiplayer-Bewegung
+    val isReloading: Boolean = false,
+    val reloadTimer: Float = 0f
 )
 
 // ─── Projektile ──────────────────────────────────────────────────────────────

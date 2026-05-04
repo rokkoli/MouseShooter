@@ -117,6 +117,22 @@ object MapGenerator {
             items.add(GroundItem.GrenadeItem(idCounter++, pos, GrenadeType.MEDKIT, rarityFromDistance(dist, maxDist, random)))
         }
 
+        // Munition: 20 Stück
+        repeat(20) {
+            val angle = random.nextFloat() * 2 * PI.toFloat()
+            val dist  = 500f + random.nextFloat() * (maxDist * 0.9f - 500f)
+            val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
+            val type = AmmoType.values().random(random)
+            val amt = when(type) {
+                AmmoType.LIGHT -> 30
+                AmmoType.HEAVY -> 10
+                AmmoType.SHELLS -> 8
+                AmmoType.ROCKETS -> 2
+                AmmoType.FUEL -> 100
+            }
+            items.add(GroundItem.AmmoItem(idCounter++, pos, type, amt, rarityFromDistance(dist, maxDist, random)))
+        }
+
         return Pair(obstacles, items)
     }
 }
@@ -176,6 +192,7 @@ object GameEngine {
                 is GroundItem.WeaponItem  -> item.copy(glowPhase = (item.glowPhase + dt * 2f) % (2 * PI.toFloat()))
                 is GroundItem.GrenadeItem -> item.copy(glowPhase = (item.glowPhase + dt * 2f) % (2 * PI.toFloat()))
                 is GroundItem.ArmorItem   -> item.copy(glowPhase = (item.glowPhase + dt * 2f) % (2 * PI.toFloat()))
+                is GroundItem.AmmoItem    -> item.copy(glowPhase = (item.glowPhase + dt * 2f) % (2 * PI.toFloat()))
             }
         })
 
@@ -277,9 +294,42 @@ object GameEngine {
                 dashCooldown   = (se.dashCooldown   - dt).coerceAtLeast(0f),
                 dashTimer      = (se.dashTimer      - dt).coerceAtLeast(0f)
             )
-            p = p.copy(statusEffects = newSe, fireCooldown = (p.fireCooldown - dt).coerceAtLeast(0f))
+            var newReloadTimer = (p.reloadTimer - dt).coerceAtLeast(0f)
+            var newIsReloading = p.isReloading
+            var newInv = p.inventory
 
-            if (!p.isLocalPlayer) return@map p // Nur lokaler Spieler verarbeitet Maus/Keyboard hier
+            // Nachladen abschließen
+            if (p.isReloading && newReloadTimer <= 0f) {
+                newIsReloading = false
+                val activeWeapon = p.inventory.activeWeapon
+                if (activeWeapon != null && activeWeapon.ammoType != null) {
+                    val ammoType = activeWeapon.ammoType
+                    val reserve = p.inventory.reserveAmmo[ammoType] ?: 0
+                    val needed = activeWeapon.clipSize - (p.inventory.clipAmmo.getOrNull(p.inventory.selectedSlotIndex - 1) ?: 0)
+                    val toReload = reserve.coerceAtMost(needed)
+                    
+                    if (toReload > 0) {
+                        val newReserves = p.inventory.reserveAmmo.toMutableMap()
+                        newReserves[ammoType] = reserve - toReload
+                        val newClips = p.inventory.clipAmmo.toMutableList()
+                        val slotIdx = p.inventory.selectedSlotIndex - 1
+                        if (slotIdx in 0..2) {
+                            newClips[slotIdx] += toReload
+                        }
+                        newInv = p.inventory.copy(reserveAmmo = newReserves, clipAmmo = newClips)
+                    }
+                }
+            }
+
+            p = p.copy(
+                statusEffects = newSe,
+                fireCooldown = (p.fireCooldown - dt).coerceAtLeast(0f),
+                reloadTimer = newReloadTimer,
+                isReloading = newIsReloading,
+                inventory = newInv
+            )
+
+            if (!p.isLocalPlayer && !p.isBot) return@map p // Bots brauchen Bewegung, aber kein Maus-Input
             if (newSe.stunTimer > 0f) return@map p  // Stun: kein Input
 
             // Mausrichtung (zoom-korrigiert)
@@ -612,23 +662,58 @@ object GameEngine {
             }
 
             // ── Angreifen ─────────────────────────────────────────────────────
-            if (dist < weaponRange * 0.85f && bot.fireCooldown <= 0f) {
+            if (dist < weaponRange * 0.85f && bot.fireCooldown <= 0f && !bot.isReloading) {
                 if (activeWeapon?.isMelee == true) {
                     val isLeft = !bot.lastMeleeLeft
                     newMeleeSwings.add(MeleeSwing(bot.id, activeWeapon, isLeft, bot.pos, targetDir, activeWeapon.range, activeWeapon.damage, activeWeapon.knockback))
                     bot = bot.copy(fireCooldown = 1f / activeWeapon.fireRate, lastMeleeLeft = isLeft)
                 } else if (activeWeapon != null) {
-                    newProjectiles.add(Projectile(
-                        id = nextId++, ownerId = bot.id,
-                        pos = bot.pos + targetDir * (PLAYER_RADIUS + activeWeapon.bulletRadius + 2f),
-                        velocity = targetDir * activeWeapon.bulletSpeed,
-                        damage = activeWeapon.damage, radius = activeWeapon.bulletRadius, color = activeWeapon.color,
-                        lifeTime = activeWeapon.range / activeWeapon.bulletSpeed,
-                        maxLifeTime = activeWeapon.range / activeWeapon.bulletSpeed,
-                        isExplosive = activeWeapon == WeaponType.ROCKET_LAUNCHER,
-                        explosionRadius = if (activeWeapon == WeaponType.ROCKET_LAUNCHER) 150f else 0f
-                    ))
-                    bot = bot.copy(fireCooldown = 1f / activeWeapon.fireRate)
+                    val clipIdx = bot.inventory.selectedSlotIndex - 1
+                    val currentAmmo = bot.inventory.clipAmmo.getOrNull(clipIdx) ?: 0
+                    if (currentAmmo > 0) {
+                        // Munition abziehen
+                        val newClips = bot.inventory.clipAmmo.toMutableList()
+                        newClips[clipIdx] = currentAmmo - 1
+                        bot = bot.copy(inventory = bot.inventory.copy(clipAmmo = newClips))
+
+                        newProjectiles.add(Projectile(
+                            id = nextId++, ownerId = bot.id,
+                            pos = bot.pos + targetDir * (PLAYER_RADIUS + activeWeapon.bulletRadius + 2f),
+                            velocity = targetDir * activeWeapon.bulletSpeed,
+                            damage = activeWeapon.damage, radius = activeWeapon.bulletRadius, color = activeWeapon.color,
+                            lifeTime = activeWeapon.range / activeWeapon.bulletSpeed,
+                            maxLifeTime = activeWeapon.range / activeWeapon.bulletSpeed,
+                            isExplosive = activeWeapon == WeaponType.ROCKET_LAUNCHER,
+                            explosionRadius = if (activeWeapon == WeaponType.ROCKET_LAUNCHER) 150f else 0f
+                        ))
+                        bot = bot.copy(fireCooldown = 1f / activeWeapon.fireRate)
+                    } else {
+                        // Nachladen triggern
+                        val reserve = bot.inventory.reserveAmmo[activeWeapon.ammoType] ?: 0
+                        if (reserve > 0) {
+                            bot = bot.copy(isReloading = true, reloadTimer = activeWeapon.reloadTime)
+                        }
+                    }
+                }
+            }
+            
+            // ── Munition sammeln falls nötig ─────────────────────────────────
+            if (bot.inventory.reserveAmmo.values.sum() < 20) {
+                val nearestAmmo = updatedGroundItems
+                    .filterIsInstance<GroundItem.AmmoItem>()
+                    .minByOrNull { it.pos.distanceTo(bot.pos) }
+                if (nearestAmmo != null && nearestAmmo.pos.distanceTo(bot.pos) < 500f) {
+                    if (nearestAmmo.pos.distanceTo(bot.pos) < PLAYER_RADIUS + 50f) {
+                        val newReserves = bot.inventory.reserveAmmo.toMutableMap()
+                        newReserves[nearestAmmo.ammoType] = (newReserves[nearestAmmo.ammoType] ?: 0) + nearestAmmo.amount
+                        bot = bot.copy(inventory = bot.inventory.copy(reserveAmmo = newReserves))
+                        updatedGroundItems.removeAll { it.id == nearestAmmo.id }
+                    } else if (!movementHandled) {
+                        val toAmmo = (nearestAmmo.pos - bot.pos + separation).normalized()
+                        val newPos = (bot.pos + toAmmo * PLAYER_SPEED * dt).clampToMap(state.mapWidth, state.mapHeight)
+                        bot = bot.copy(pos = resolveObstacleCollision(newPos, state.obstacles, PLAYER_RADIUS), rotation = atan2(toAmmo.y, toAmmo.x))
+                        movementHandled = true
+                    }
                 }
             }
             
@@ -688,6 +773,25 @@ object GameEngine {
         if (inv.selectedSlotIndex in 4..5) return throwGrenadeToMouse(state, playerId)
 
         val weapon = inv.activeWeapon ?: return state
+        if (player.isReloading) return state
+
+        // Munition prüfen (außer Nahkampf)
+        if (!weapon.isMelee) {
+            val clipIdx = inv.selectedSlotIndex - 1
+            val currentAmmo = inv.clipAmmo.getOrNull(clipIdx) ?: 0
+            if (currentAmmo <= 0) {
+                // Auto-Reload triggern
+                val ammoType = weapon.ammoType
+                val reserve = inv.reserveAmmo[ammoType] ?: 0
+                if (reserve > 0) {
+                    return state.copy(players = state.players.map {
+                        if (it.id == playerId) it.copy(isReloading = true, reloadTimer = weapon.reloadTime) else it
+                    })
+                }
+                return state // Keine Munition mehr
+            }
+        }
+
         var newState = state; var nextId = state.nextId
 
         if (weapon.isMelee) {
@@ -698,6 +802,15 @@ object GameEngine {
                 players = newState.players.map { if (it.id == playerId) it.copy(lastMeleeLeft = isLeft) else it }
             )
         } else {
+            // Munition verbrauchen
+            val clipIdx = inv.selectedSlotIndex - 1
+            val newClips = inv.clipAmmo.toMutableList()
+            if (clipIdx in newClips.indices) newClips[clipIdx] = (newClips[clipIdx] - 1).coerceAtLeast(0)
+            
+            newState = newState.copy(players = newState.players.map { 
+                if (it.id == playerId) it.copy(inventory = it.inventory.copy(clipAmmo = newClips)) else it 
+            })
+
             val spreadCount = if (weapon == WeaponType.FLAMETHROWER) 5 else if (weapon == WeaponType.SHOTGUN) 8 else 1
             val spread = if (weapon == WeaponType.FLAMETHROWER) 0.3f else if (weapon == WeaponType.SHOTGUN) 0.5f else 0.02f
             repeat(spreadCount) { s ->
@@ -791,6 +904,12 @@ object GameEngine {
                     droppedItem = GroundItem.ArmorItem(idCounter++, dropPos, oldArmor, Rarity.COMMON)
                 }
                 player.inventory.copy(armorSlot = item.armorType)
+            }
+            is GroundItem.AmmoItem -> {
+                val newReserves = player.inventory.reserveAmmo.toMutableMap()
+                val current = newReserves[item.ammoType] ?: 0
+                newReserves[item.ammoType] = current + item.amount
+                player.inventory.copy(reserveAmmo = newReserves)
             }
         }
         

@@ -571,11 +571,13 @@ fun createGameSyncData(state: GameState): GameSyncData {
                 is GroundItem.WeaponItem -> 0
                 is GroundItem.GrenadeItem -> 1
                 is GroundItem.ArmorItem -> 2
+                is GroundItem.AmmoItem -> 3
             }
             val label = when(gi) {
                 is GroundItem.WeaponItem -> gi.weaponType.name
                 is GroundItem.GrenadeItem -> gi.grenadeType.name
                 is GroundItem.ArmorItem -> gi.armorType.name
+                is GroundItem.AmmoItem -> gi.ammoType.name
             }
             GroundItemSyncData(gi.id, type, gi.pos.x, gi.pos.y, label, gi.rarity.ordinal)
         },
@@ -666,7 +668,8 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
         when(gi.type) {
             0 -> GroundItem.WeaponItem(gi.id, Vec2(gi.x, gi.y), WeaponType.valueOf(gi.itemType), rarity)
             1 -> GroundItem.GrenadeItem(gi.id, Vec2(gi.x, gi.y), GrenadeType.valueOf(gi.itemType), rarity)
-            else -> GroundItem.ArmorItem(gi.id, Vec2(gi.x, gi.y), ArmorType.valueOf(gi.itemType), rarity)
+            2 -> GroundItem.ArmorItem(gi.id, Vec2(gi.x, gi.y), ArmorType.valueOf(gi.itemType), rarity)
+            else -> GroundItem.AmmoItem(gi.id, Vec2(gi.x, gi.y), AmmoType.valueOf(gi.itemType), 30, rarity) // Default amount 30
         }
     }
 

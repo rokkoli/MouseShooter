@@ -90,6 +90,7 @@ object GameRenderer {
                 is GroundItem.WeaponItem  -> item.glowPhase
                 is GroundItem.GrenadeItem -> item.glowPhase
                 is GroundItem.ArmorItem   -> item.glowPhase
+                is GroundItem.AmmoItem    -> item.glowPhase
             }
             val glowAlpha  = (sin(glowPhase) * 0.4f + 0.5f).coerceIn(0f, 1f)
             val glowRadius = (14f + sin(glowPhase) * 4f) * zoom
@@ -105,6 +106,7 @@ object GameRenderer {
                     else drawGrenadeIcon(c, item.grenadeType, glowRadius)
                 }
                 is GroundItem.ArmorItem   -> drawArmorIcon(c, item.armorType, glowRadius)
+                is GroundItem.AmmoItem    -> drawAmmoIcon(c, item.ammoType, glowRadius)
             }
         }
 
@@ -349,6 +351,16 @@ object GameRenderer {
         val red = Color.Red
         drawRect(red, Offset(center.x - 2f, center.y - 5f), Size(4f, 10f))
         drawRect(red, Offset(center.x - 5f, center.y - 2f), Size(10f, 4f))
+    }
+
+    private fun DrawScope.drawAmmoIcon(center: Offset, type: AmmoType, radius: Float) {
+        val col = Color(type.color)
+        drawCircle(col.copy(alpha = 0.3f), radius, center)
+        // Drei kleine Striche für Patronen
+        repeat(3) { i ->
+            val ox = (i - 1) * 6f
+            drawRect(col, Offset(center.x + ox - 1f, center.y - 5f), Size(2f, 10f))
+        }
     }
 
     // ── Minimap ───────────────────────────────────────────────────────────────
