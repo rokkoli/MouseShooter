@@ -141,7 +141,7 @@ data class Inventory(
     val gunSlots: List<WeaponType?> = listOf(WeaponType.PISTOL, null, null),
     val grenadeSlots: List<GrenadeType?> = listOf(null, null),
     val armorSlot: ArmorType? = null,
-    val selectedSlotIndex: Int = 1  // 0=melee, 1-3=guns, 4-5=grenades
+    val selectedSlotIndex: Int = 1  // 0=melee, 1-3=guns, 4-5=grenades, 6=armor
 ) {
     val activeWeapon: WeaponType? get() = when {
         selectedSlotIndex == 0 -> meleeSlot
@@ -154,29 +154,33 @@ data class Inventory(
     }
 
     fun scrollNext(): Inventory {
-        var next = (selectedSlotIndex + 1) % 6
-        repeat(6) {
+        var next = (selectedSlotIndex + 1) % 7
+        repeat(7) {
             val hasItem = when {
                 next == 0 -> meleeSlot != null
                 next in 1..3 -> gunSlots.getOrNull(next - 1) != null
-                else -> grenadeSlots.getOrNull(next - 4) != null
+                next in 4..5 -> grenadeSlots.getOrNull(next - 4) != null
+                next == 6 -> armorSlot != null
+                else -> false
             }
             if (hasItem) return this.copy(selectedSlotIndex = next)
-            next = (next + 1) % 6
+            next = (next + 1) % 7
         }
         return this
     }
 
     fun scrollPrev(): Inventory {
-        var prev = (selectedSlotIndex - 1 + 6) % 6
-        repeat(6) {
+        var prev = (selectedSlotIndex - 1 + 7) % 7
+        repeat(7) {
             val hasItem = when {
                 prev == 0 -> meleeSlot != null
                 prev in 1..3 -> gunSlots.getOrNull(prev - 1) != null
-                else -> grenadeSlots.getOrNull(prev - 4) != null
+                prev in 4..5 -> grenadeSlots.getOrNull(prev - 4) != null
+                prev == 6 -> armorSlot != null
+                else -> false
             }
             if (hasItem) return this.copy(selectedSlotIndex = prev)
-            prev = (prev - 1 + 6) % 6
+            prev = (prev - 1 + 7) % 7
         }
         return this
     }

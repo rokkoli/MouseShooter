@@ -134,19 +134,16 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
         // Index: 0=Melee, 1-3=Guns, 4-5=Grenades, 6=Rüstung
         allSlots.forEachIndexed { index, (label, color) ->
             val isActive = index == inv.selectedSlotIndex
-            val isSelectable = index < 6 // Rüstungs-Slot nicht auswählbar per Scroll
             val slotColor = color?.let { Color(it) } ?: Color.Transparent
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 // Slot-Nummer
-                if (isSelectable) {
-                    Text(
-                        text = "${index + 1}",
-                        color = if (isActive) SlotActive else Color.Gray,
-                        fontSize = 10.sp,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    )
-                }
+                Text(
+                    text = "${index + 1}",
+                    color = if (isActive) SlotActive else Color.Gray,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
 
                 Box(
                     modifier = Modifier

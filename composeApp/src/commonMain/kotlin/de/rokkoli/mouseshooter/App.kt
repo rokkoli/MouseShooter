@@ -194,13 +194,7 @@ fun GameScreen(mode: GameMode, onRestart: () -> Unit) {
                 localPlayer = localPlayer,
                 onArmorClick = {
                     val player = gameState.players.firstOrNull { it.isLocalPlayer && it.isAlive }
-                    if (player != null) {
-                        gameState = when (player.inventory.armorSlot) {
-                            ArmorType.AGILITY -> GameEngine.dash(gameState, player.id)
-                            ArmorType.STEALTH -> GameEngine.activateStealth(gameState, player.id)
-                            else -> gameState
-                        }
-                    }
+                    if (player != null) gameState = GameEngine.activateArmorAbility(gameState, player.id)
                 }
             )
 

@@ -679,9 +679,12 @@ object GameEngine {
     // ── Schießen / Granate per LMB ────────────────────────────────────────────
     fun shoot(state: GameState, playerId: Int): GameState {
         val player = state.players.firstOrNull { it.id == playerId } ?: return state
-        if (!player.isAlive || player.isSpawning || player.fireCooldown > 0f) return state
+        if (!player.isAlive || player.isSpawning) return state
 
         val inv = player.inventory
+        if (inv.selectedSlotIndex == 6) return activateArmorAbility(state, playerId)
+        
+        if (player.fireCooldown > 0f) return state
         if (inv.selectedSlotIndex in 4..5) return throwGrenadeToMouse(state, playerId)
 
         val weapon = inv.activeWeapon ?: return state
@@ -813,6 +816,15 @@ object GameEngine {
         val se = player.statusEffects; if (se.dashCooldown > 0f) return state
         val newSe = se.copy(invisibleTimer = 5f, dashCooldown = 15f)
         return state.copy(players = state.players.map { if (it.id == playerId) it.copy(statusEffects = newSe) else it })
+    }
+
+    fun activateArmorAbility(state: GameState, playerId: Int): GameState {
+        val player = state.players.firstOrNull { it.id == playerId } ?: return state
+        return when (player.inventory.armorSlot) {
+            ArmorType.AGILITY -> dash(state, playerId)
+            ArmorType.STEALTH -> activateStealth(state, playerId)
+            else -> state
+        }
     }
 
     fun scrollSlot(state: GameState, playerId: Int, up: Boolean): GameState {

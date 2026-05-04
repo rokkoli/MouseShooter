@@ -374,11 +374,15 @@ fun MultiplayerGameScreen(
                     localPlayer = localPlayer?.copy(isLocalPlayer = true),
                     onArmorClick = {
                         val player = gs.players.firstOrNull { it.id == myPlayerIndex && it.isAlive }
-                        if (player != null && isHost) {
-                            gameState = when (player.inventory.armorSlot) {
-                                ArmorType.AGILITY -> GameEngine.dash(gs, player.id)
-                                ArmorType.STEALTH -> GameEngine.activateStealth(gs, player.id)
-                                else -> gs
+                        if (player != null) {
+                            if (isHost) {
+                                gameState = GameEngine.activateArmorAbility(gs, player.id)
+                            } else {
+                                // Guest: Wir wählen den Slot aus und "schießen" (aktivieren)
+                                gameState = gs.copy(players = gs.players.map { p ->
+                                    if (p.id == myPlayerIndex) p.copy(inventory = p.inventory.copy(selectedSlotIndex = 6)) else p
+                                })
+                                connector.sendShoot(myPlayerIndex)
                             }
                         }
                     }
