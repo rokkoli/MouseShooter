@@ -14,16 +14,16 @@ enum class WeaponType(
     val isMelee: Boolean = false,
     val knockback: Float = 0f
 ) {
-    FISTS("Fäuste",          6f,  2f,   0f,  0f,  80f, 0xFFFFAAAA, true, 180f),
-    KNIFE("Messer",          10f, 4f,   0f,  0f,  70f, 0xFFCCCCCC, true,  70f),
-    LONG_KNIFE("Langmesser", 20f, 2.5f, 0f,  0f, 100f, 0xFFAABBCC, true,  90f),
-    BOXING_GLOVES("Boxhandschuhe", 2f, 5f, 0f, 0f, 75f, 0xFFFF6600, true, 380f),
-    PISTOL("Pistole",        14f, 2f,  800f, 2.5f, 800f, 0xFFFFDD00),
+    FISTS("Fäuste",          2f,  2f,   0f,  0f,  80f, 0xFFFFAAAA, true, 180f),
+    KNIFE("Messer",          8f, 4f,   0f,  0f,  70f, 0xFFCCCCCC, true,  70f),
+    LONG_KNIFE("Langmesser", 12f, 2.5f, 0f,  0f, 100f, 0xFFAABBCC, true,  90f),
+    BOXING_GLOVES("Boxhandschuhe", 3f, 5f, 0f, 0f, 75f, 0xFFFF6600, true, 380f),
+    PISTOL("Pistole",        10f, 2f,  800f, 2.5f, 800f, 0xFFFFDD00),
     SMG("Maschinengewehr",    7f, 8f,  900f, 2f, 700f, 0xFF00AAFF),
-    SHOTGUN("Schrotflinte",  10f, 1f,  850f, 2f, 450f, 0xFF884444),
+    SHOTGUN("Schrotflinte",  11f, 1f,  850f, 2f, 450f, 0xFF884444),
     FLAMETHROWER("Flammenwerfer", 3f, 30f, 300f, 3f, 250f, 0xFFFF4400),
-    ROCKET_LAUNCHER("Raketenwerfer", 45f, 0.5f, 350f, 8f, 900f, 0xFFFF8800),
-    MINIGUN("Minigun", 5f, 18f, 1100f, 2f, 750f, 0xFF4455FF),
+    ROCKET_LAUNCHER("Raketenwerfer", 35f, 0.5f, 350f, 8f, 900f, 0xFFFF8800),
+    MINIGUN("Minigun", 5f, 14f, 1100f, 2f, 750f, 0xFF4455FF),
     SNIPER("Sniper", 150f, 0.1f, 4000f, 2f, 10000f, 0xFFFF0033);
 }
 
@@ -304,7 +304,8 @@ data class MeleeSwing(
     val range: Float,
     val damage: Float,
     val knockback: Float,
-    var timer: Float = 0.15f
+    var timer: Float = 0.15f,
+    val hitPlayerIds: Set<Int> = emptySet()
 )
 
 // ─── Hauptspielzustand ────────────────────────────────────────────────────────

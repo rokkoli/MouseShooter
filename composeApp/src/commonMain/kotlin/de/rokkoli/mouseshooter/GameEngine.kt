@@ -436,17 +436,33 @@ object GameEngine {
     // ── Melee ─────────────────────────────────────────────────────────────────
     private fun updateMeleeSwings(state: GameState, dt: Float): GameState {
         val remaining = mutableListOf<MeleeSwing>()
-        val players = state.players.toMutableList()
+        var players = state.players
         for (swing in state.meleeSwings) {
-            val tipPos = swing.pos + swing.direction * swing.range
-            for (i in players.indices) {
-                val t = players[i]; if (!t.isAlive || t.isSpawning || t.id == swing.ownerId) continue
+            var currentSwing = swing
+            val tipPos = currentSwing.pos + currentSwing.direction * currentSwing.range
+            val newlyHit = mutableSetOf<Int>()
+            
+            players = players.map { t ->
+                if (!t.isAlive || t.isSpawning || t.id == currentSwing.ownerId || currentSwing.hitPlayerIds.contains(t.id)) return@map t
+                
                 if (t.pos.distanceTo(tipPos) < PLAYER_RADIUS * 2.5f) {
-                    val newHp = t.hp - swing.damage; val kbDir = (t.pos - swing.pos).normalized()
-                    players[i] = t.copy(hp = newHp.coerceAtLeast(0f), isAlive = newHp > 0f, velocity = t.velocity + kbDir * swing.knockback, lastDamagedBy = swing.ownerId)
-                }
+                    newlyHit.add(t.id)
+                    val newHp = t.hp - currentSwing.damage
+                    val kbDir = (t.pos - currentSwing.pos).normalized()
+                    t.copy(
+                        hp = newHp.coerceAtLeast(0f),
+                        isAlive = newHp > 0f,
+                        velocity = t.velocity + kbDir * currentSwing.knockback,
+                        lastDamagedBy = currentSwing.ownerId
+                    )
+                } else t
             }
-            val ns = swing.copy(timer = swing.timer - dt); if (ns.timer > 0f) remaining.add(ns)
+            
+            val ns = currentSwing.copy(
+                timer = currentSwing.timer - dt,
+                hitPlayerIds = currentSwing.hitPlayerIds + newlyHit
+            )
+            if (ns.timer > 0f) remaining.add(ns)
         }
         return state.copy(meleeSwings = remaining, players = players)
     }
