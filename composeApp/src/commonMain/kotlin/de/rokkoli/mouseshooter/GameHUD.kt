@@ -147,18 +147,11 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
 
                 Box(
                     modifier = Modifier
-                        .size(if (index == 6) 50.dp else 58.dp, if (index == 6) 50.dp else 58.dp)
-                        .then(
-                            if (index == 6) {
-                                Modifier.background(if (isActive) Color(0x4400CCFF) else SlotInactive, RoundedCornerShape(8.dp))
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { onArmorClick() }
-                            } else {
-                                Modifier.background(if (isActive) Color(0x4400CCFF) else SlotInactive, RoundedCornerShape(8.dp))
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .then(if (isActive) Modifier.background(Color(0x2200AAFF), RoundedCornerShape(8.dp)) else Modifier)
-                            }
-                        ),
+                        .size(58.dp)
+                        .background(if (isActive) Color(0x4400CCFF) else SlotInactive, RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(if (isActive) Modifier.background(Color(0x2200AAFF), RoundedCornerShape(8.dp)) else Modifier)
+                        .then(if (index == 6) Modifier.clickable { onArmorClick() } else Modifier),
                     contentAlignment = Alignment.Center
                 ) {
                     if (color != null) {
