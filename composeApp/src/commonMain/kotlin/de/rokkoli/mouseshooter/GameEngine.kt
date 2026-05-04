@@ -491,6 +491,8 @@ object GameEngine {
         val newMeleeSwings = mutableListOf<MeleeSwing>()
         var nextId = state.nextId
 
+        val updatedGroundItems = state.groundItems.toMutableList()
+
         for (i in players.indices) {
             var bot = players[i]
             if (bot.isLocalPlayer || !bot.isAlive || !bot.isBot) continue
@@ -531,7 +533,7 @@ object GameEngine {
             // ── Ohne Schusswaffe: nearest Weapon-Item ansteuern ───────────────
             val hasRanged = bot.inventory.gunSlots.any { it != null }
             if (!hasRanged) {
-                val nearestWeaponItem = state.groundItems
+                val nearestWeaponItem = updatedGroundItems
                     .filterIsInstance<GroundItem.WeaponItem>()
                     .filter { !it.weaponType.isMelee }
                     .minByOrNull { it.pos.distanceTo(bot.pos) }
@@ -541,6 +543,7 @@ object GameEngine {
                     if (toItem.length() < PLAYER_RADIUS + 50f) {
                         // aufheben
                         bot = bot.copy(inventory = bot.inventory.addWeapon(nearestWeaponItem.weaponType).copy(selectedSlotIndex = 1))
+                        updatedGroundItems.removeAll { it.id == nearestWeaponItem.id }
                     } else {
                         val dir = (toItem + separation).normalized()
                         val newPos = (bot.pos + dir * PLAYER_SPEED * dt).clampToMap(state.mapWidth, state.mapHeight)
@@ -649,7 +652,7 @@ object GameEngine {
         }
 
         return state.copy(players = players, projectiles = state.projectiles + newProjectiles,
-            meleeSwings = state.meleeSwings + newMeleeSwings, nextId = nextId)
+            meleeSwings = state.meleeSwings + newMeleeSwings, nextId = nextId, groundItems = updatedGroundItems)
     }
 
     /** Findet eine Position hinter einem Hindernis, aus der Richtung des Angreifers gesehen */
@@ -744,13 +747,14 @@ object GameEngine {
         
         var droppedItem: GroundItem? = null
         var idCounter = state.nextId
+        val dropPos = player.pos + Vec2(Random.nextFloat() * 40f - 20f, Random.nextFloat() * 40f - 20f)
         
         val newInv = when (item) {
             is GroundItem.WeaponItem  -> {
                 if (item.weaponType.isMelee) {
                     val oldW = player.inventory.meleeSlot
                     if (oldW != WeaponType.FISTS && oldW != null) {
-                        droppedItem = GroundItem.WeaponItem(idCounter++, player.pos, oldW, Rarity.COMMON)
+                        droppedItem = GroundItem.WeaponItem(idCounter++, dropPos, oldW, Rarity.COMMON)
                     }
                     player.inventory.copy(meleeSlot = item.weaponType)
                 } else {
@@ -759,16 +763,32 @@ object GameEngine {
                     if (freeIdx >= 0) {
                         newGuns[freeIdx] = item.weaponType
                     } else {
-                        // Drop das aktuell ausgewählte oder das erste
                         val swapIdx = if (player.inventory.selectedSlotIndex in 1..3) player.inventory.selectedSlotIndex - 1 else 0
-                        droppedItem = GroundItem.WeaponItem(idCounter++, player.pos, newGuns[swapIdx]!!, Rarity.COMMON)
+                        droppedItem = GroundItem.WeaponItem(idCounter++, dropPos, newGuns[swapIdx]!!, Rarity.COMMON)
                         newGuns[swapIdx] = item.weaponType
                     }
                     player.inventory.copy(gunSlots = newGuns)
                 }
             }
-            is GroundItem.GrenadeItem -> player.inventory.addGrenade(item.grenadeType)
-            is GroundItem.ArmorItem   -> player.inventory.addArmor(item.armorType)
+            is GroundItem.GrenadeItem -> {
+                val newGrenades = player.inventory.grenadeSlots.toMutableList()
+                val freeIdx = newGrenades.indexOfFirst { it == null }
+                if (freeIdx >= 0) {
+                    newGrenades[freeIdx] = item.grenadeType
+                } else {
+                    val swapIdx = if (player.inventory.selectedSlotIndex in 4..5) player.inventory.selectedSlotIndex - 4 else 0
+                    droppedItem = GroundItem.GrenadeItem(idCounter++, dropPos, newGrenades[swapIdx]!!, Rarity.COMMON)
+                    newGrenades[swapIdx] = item.grenadeType
+                }
+                player.inventory.copy(grenadeSlots = newGrenades)
+            }
+            is GroundItem.ArmorItem   -> {
+                val oldArmor = player.inventory.armorSlot
+                if (oldArmor != null) {
+                    droppedItem = GroundItem.ArmorItem(idCounter++, dropPos, oldArmor, Rarity.COMMON)
+                }
+                player.inventory.copy(armorSlot = item.armorType)
+            }
         }
         
         val newItems = state.groundItems.filter { it.id != item.id }.toMutableList()
