@@ -86,6 +86,19 @@ data class PlayerSyncData(
     val fireCooldown: Float,
     val velocityX: Float,
     val velocityY: Float,
+    // Inventory
+    val meleeSlot: String?,
+    val gunSlots: List<String?>,
+    val grenadeSlots: List<String?>,
+    val armorSlot: String?,
+    val clipAmmo: List<Int>,
+    val reserveAmmo: Map<String, Int>,
+    val meleeRarity: Int,
+    val gunRarities: List<Int>,
+    val grenadeRarities: List<Int>,
+    val armorRarity: Int?,
+    val isReloading: Boolean = false,
+    val reloadTimer: Float = 0f,
 )
 
 /** Projectile sync data. */

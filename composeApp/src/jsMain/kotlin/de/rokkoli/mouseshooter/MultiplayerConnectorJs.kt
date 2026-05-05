@@ -78,6 +78,18 @@ class JsMultiplayerConnector : MultiplayerConnector() {
                             fireCooldown = (p.fireCooldown as Number).toFloat(),
                             velocityX = (p.velocityX as Number).toFloat(),
                             velocityY = (p.velocityY as Number).toFloat(),
+                            meleeSlot = p.meleeSlot?.toString(),
+                            gunSlots = (p.gunSlots as Array<dynamic>).map { it?.toString() },
+                            grenadeSlots = (p.grenadeSlots as Array<dynamic>).map { it?.toString() },
+                            armorSlot = p.armorSlot?.toString(),
+                            clipAmmo = (p.clipAmmo as Array<dynamic>).map { (it as Number).toInt() },
+                            reserveAmmo = jsObjectToMap(p.reserveAmmo),
+                            meleeRarity = (p.meleeRarity as Number).toInt(),
+                            gunRarities = (p.gunRarities as Array<dynamic>).map { (it as Number).toInt() },
+                            grenadeRarities = (p.grenadeRarities as Array<dynamic>).map { (it as Number).toInt() },
+                            armorRarity = (p.armorRarity as? Number)?.toInt(),
+                            isReloading = p.isReloading as? Boolean ?: false,
+                            reloadTimer = (p.reloadTimer as? Number)?.toFloat() ?: 0f,
                         )
                     }
                     val projectiles = (data.projectiles as? Array<dynamic>)?.map { proj ->
@@ -214,4 +226,14 @@ class JsMultiplayerConnector : MultiplayerConnector() {
     override fun sendGameOver(winnerId: Int) { network.sendGameOver(winnerId) }
     override fun sendShoot(playerIndex: Int) { network.sendShoot(playerIndex) }
     override fun sendPickup(playerIndex: Int) { network.sendPickup(playerIndex) }
+}
+
+fun jsObjectToMap(obj: dynamic): Map<String, Int> {
+    if (obj == null) return emptyMap()
+    val map = mutableMapOf<String, Int>()
+    val keys = js("Object.keys(obj)").unsafeCast<Array<String>>()
+    for (key in keys) {
+        map[key] = (obj[key] as Number).toInt()
+    }
+    return map
 }

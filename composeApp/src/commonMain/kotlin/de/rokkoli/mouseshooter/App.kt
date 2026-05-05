@@ -75,6 +75,7 @@ fun GameScreen(mode: GameMode, onRestart: () -> Unit) {
     var isLeftDown  by remember { mutableStateOf(false) }
     var wasLeftDown by remember { mutableStateOf(false) }
     var screenSize  by remember { mutableStateOf(Vec2(1280f, 800f)) }
+    var forceGameOver by remember { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
     var lastMark by remember { mutableStateOf(kotlin.time.TimeSource.Monotonic.markNow()) }
@@ -188,14 +189,15 @@ fun GameScreen(mode: GameMode, onRestart: () -> Unit) {
         }
 
         // ── HUD (Compose-Layer) ───────────────────────────────────────────────
-        if (!gameState.isGameOver) {
+        if (!gameState.isGameOver && !forceGameOver) {
             GameHUD(
                 state = gameState,
                 localPlayer = localPlayer,
                 onArmorClick = {
                     val player = gameState.players.firstOrNull { it.isLocalPlayer && it.isAlive }
                     if (player != null) gameState = GameEngine.activateArmorAbility(gameState, player.id)
-                }
+                },
+                onExitSpectate = { forceGameOver = true }
             )
 
             // Spawn-Countdown oben in der Mitte
@@ -205,9 +207,10 @@ fun GameScreen(mode: GameMode, onRestart: () -> Unit) {
             }
         }
 
-        if (gameState.isGameOver) {
+        if (gameState.isGameOver || forceGameOver) {
             GameOverScreen(state = gameState, onRestart = {
                 gameState = createInitialState()
+                forceGameOver = false
                 onRestart()
             })
         }

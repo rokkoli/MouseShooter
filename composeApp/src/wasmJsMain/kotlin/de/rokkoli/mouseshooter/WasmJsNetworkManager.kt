@@ -33,6 +33,12 @@ internal external fun createJsArray(): JsAny
 @JsFun("function(arr, item) { arr.push(item); }")
 internal external fun pushJsArray(arr: JsAny, item: JsAny)
 
+@JsFun("function(arr) { arr.push(null); }")
+internal external fun pushJsNull(arr: JsAny)
+
+@JsFun("function(obj, key) { obj[key] = null; }")
+internal external fun setJsNull(obj: JsAny, key: String)
+
 @JsFun("function(arr) { return arr.length; }")
 internal external fun getJsArrayLength(arr: JsAny): Int
 
@@ -59,6 +65,15 @@ internal external fun getJsLong(obj: JsAny, key: String): Double
 
 @JsFun("function() { return window.performance.now(); }")
 internal external fun performanceNow(): Float
+
+@JsFun("function(arr, index) { return arr[index]; }")
+internal external fun getJsIntAt(arr: JsAny, index: Int): Int
+
+@JsFun("function(obj) { return Object.keys(obj); }")
+internal external fun getJsKeys(obj: JsAny): JsAny
+
+@JsFun("function(obj, key) { return obj[key]; }")
+internal external fun getJsAny(obj: JsAny, key: String): JsAny?
 
 @JsFun("function(message) { console.log(message); }")
 internal external fun consoleLog(message: String)
@@ -252,6 +267,42 @@ class WasmJsNetworkManager {
             setJsFloat(pObj, "fireCooldown", p.fireCooldown)
             setJsFloat(pObj, "velocityX", p.velocityX)
             setJsFloat(pObj, "velocityY", p.velocityY)
+            
+            if (p.meleeSlot != null) setJsString(pObj, "meleeSlot", p.meleeSlot)
+            
+            val gunSlotsArr = createJsArray()
+            p.gunSlots.forEach { s -> if (s != null) pushJsArray(gunSlotsArr, s.toJsString()) else pushJsNull(gunSlotsArr) }
+            setJsAny(pObj, "gunSlots", gunSlotsArr)
+            
+            val grenadeSlotsArr = createJsArray()
+            p.grenadeSlots.forEach { s -> if (s != null) pushJsArray(grenadeSlotsArr, s.toJsString()) else pushJsNull(grenadeSlotsArr) }
+            setJsAny(pObj, "grenadeSlots", grenadeSlotsArr)
+            
+            if (p.armorSlot != null) setJsString(pObj, "armorSlot", p.armorSlot)
+            
+            val clipAmmoArr = createJsArray()
+            p.clipAmmo.forEach { a -> pushJsArray(clipAmmoArr, a.toJsNumber()) }
+            setJsAny(pObj, "clipAmmo", clipAmmoArr)
+            
+            val reserveAmmoObj = createJsObject()
+            p.reserveAmmo.forEach { (k, v) -> setJsInt(reserveAmmoObj, k, v) }
+            setJsAny(pObj, "reserveAmmo", reserveAmmoObj)
+            
+            setJsInt(pObj, "meleeRarity", p.meleeRarity)
+            
+            val gunRaritiesArr = createJsArray()
+            p.gunRarities.forEach { r -> pushJsArray(gunRaritiesArr, r.toJsNumber()) }
+            setJsAny(pObj, "gunRarities", gunRaritiesArr)
+            
+            val grenadeRaritiesArr = createJsArray()
+            p.grenadeRarities.forEach { r -> pushJsArray(grenadeRaritiesArr, r.toJsNumber()) }
+            setJsAny(pObj, "grenadeRarities", grenadeRaritiesArr)
+            
+            if (p.armorRarity != null) setJsInt(pObj, "armorRarity", p.armorRarity)
+            
+            setJsBoolean(pObj, "isReloading", p.isReloading)
+            setJsFloat(pObj, "reloadTimer", p.reloadTimer)
+            
             pushJsArray(playersArr, pObj)
         }
         setJsAny(msg, "players", playersArr)

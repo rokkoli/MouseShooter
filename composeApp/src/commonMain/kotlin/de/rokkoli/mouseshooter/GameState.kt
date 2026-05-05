@@ -31,7 +31,7 @@ enum class WeaponType(
     BOXING_GLOVES("Boxhandschuhe", 3f, 5f, 0f, 0f, 75f, 0xFFFF6600, true, 380f),
     PISTOL("Pistole",        10f, 2f,  800f, 2.5f, 800f, 0xFFFFDD00, false, 0f, AmmoType.LIGHT, 12, 1.5f),
     SMG("Maschinengewehr",    7f, 8f,  900f, 2f, 700f, 0xFF00AAFF, false, 0f, AmmoType.LIGHT, 30, 2.0f),
-    SHOTGUN("Schrotflinte",  11f, 1f,  850f, 2f, 450f, 0xFF884444, false, 0f, AmmoType.SHELLS, 8, 2.5f),
+    SHOTGUN("Schrotflinte",  11f, 1f,  850f, 2f, 450f, 0xFF884444, false, 0f, AmmoType.SHELLS, 1, 2.5f),
     FLAMETHROWER("Flammenwerfer", 3f, 30f, 300f, 3f, 250f, 0xFFFF4400, false, 0f, AmmoType.FUEL, 100, 3.0f),
     ROCKET_LAUNCHER("Raketenwerfer", 35f, 0.5f, 350f, 8f, 900f, 0xFFFF8800, false, 0f, AmmoType.ROCKETS, 1, 3.5f),
     MINIGUN("Minigun", 5f, 14f, 1100f, 2f, 750f, 0xFF4455FF, false, 0f, AmmoType.LIGHT, 100, 5.0f),
@@ -55,12 +55,12 @@ enum class ArmorType(val label: String, val color: Long) {
 }
 
 // ─── Rarity ─────────────────────────────────────────────────────────────────
-enum class Rarity(val glowColor: Long, val label: String) {
-    COMMON(0xFF888888, "Häufig"),
-    UNCOMMON(0xFF4488FF, "Ungewöhnlich"),
-    RARE(0xFF44FF44, "Selten"),
-    EPIC(0xFFAA44FF, "Episch"),
-    LEGENDARY(0xFFFFFF00, "Legendär");
+enum class Rarity(val glowColor: Long, val label: String, val damageMod: Float, val fireRateMod: Float, val reloadMod: Float) {
+    COMMON(0xFF888888, "Häufig", 1.0f, 1.0f, 1.0f),
+    UNCOMMON(0xFF4488FF, "Ungewöhnlich", 1.15f, 1.05f, 0.95f),
+    RARE(0xFF44FF44, "Selten", 1.30f, 1.15f, 0.85f),
+    EPIC(0xFFAA44FF, "Episch", 1.50f, 1.30f, 0.70f),
+    LEGENDARY(0xFFFFFF00, "Legendär", 2.0f, 1.60f, 0.50f);
 }
 
 fun rarityFromDistance(dist: Float, maxDist: Float, random: kotlin.random.Random = kotlin.random.Random): Rarity {
@@ -102,6 +102,17 @@ data class Obstacle(
         val cx = center.x.coerceIn(pos.x, pos.x + width)
         val cy = center.y.coerceIn(pos.y, pos.y + height)
         return center.distanceTo(Vec2(cx, cy)) < radius
+    }
+
+    fun intersectsSegment(p1: Vec2, p2: Vec2, radius: Float): Boolean {
+        val dist = p1.distanceTo(p2)
+        val steps = (dist / 15f).toInt().coerceAtLeast(1)
+        for (i in 0..steps) {
+            val t = i.toFloat() / steps
+            val p = p1 + (p2 - p1) * t
+            if (intersectsCircle(p, radius)) return true
+        }
+        return false
     }
 }
 
@@ -158,9 +169,13 @@ data class StatusEffects(
 // ─── Inventar-Slot ────────────────────────────────────────────────────────────
 data class Inventory(
     val meleeSlot: WeaponType? = WeaponType.FISTS,
+    val meleeRarity: Rarity = Rarity.COMMON,
     val gunSlots: List<WeaponType?> = listOf(WeaponType.PISTOL, null, null),
+    val gunRarities: List<Rarity> = listOf(Rarity.COMMON, Rarity.COMMON, Rarity.COMMON),
     val grenadeSlots: List<GrenadeType?> = listOf(null, null),
+    val grenadeRarities: List<Rarity> = listOf(Rarity.COMMON, Rarity.COMMON),
     val armorSlot: ArmorType? = null,
+    val armorRarity: Rarity? = null,
     val selectedSlotIndex: Int = 1,  // 0=melee, 1-3=guns, 4-5=grenades, 6=armor
     val clipAmmo: List<Int> = listOf(12, 0, 0), // Ammo in Magazin für gunSlots
     val reserveAmmo: Map<AmmoType, Int> = mapOf(
@@ -213,29 +228,46 @@ data class Inventory(
         return this
     }
 
-    fun addWeapon(w: WeaponType): Inventory {
-        if (w.isMelee) return copy(meleeSlot = w)
+    fun addWeapon(w: WeaponType, r: Rarity): Inventory {
+        if (w.isMelee) return copy(meleeSlot = w, meleeRarity = r)
         val newGuns = gunSlots.toMutableList()
+        val newRarities = gunRarities.toMutableList()
         val newClip = clipAmmo.toMutableList()
         val freeIdx = newGuns.indexOfFirst { it == null }
         if (freeIdx >= 0) {
             newGuns[freeIdx] = w
-            newClip[freeIdx] = w.clipSize
+            newRarities[freeIdx] = r
+            // Spezielle Logik für Schrotflinte: Häufig/Selten = 1 Schuss, Episch/Legendär = 2 Schuss
+            val clipSize = if (w == WeaponType.SHOTGUN) {
+                if (r.ordinal >= Rarity.EPIC.ordinal) 2 else 1
+            } else w.clipSize
+            newClip[freeIdx] = clipSize
         } else {
             newGuns[0] = w
-            newClip[0] = w.clipSize
+            newRarities[0] = r
+            val clipSize = if (w == WeaponType.SHOTGUN) {
+                if (r.ordinal >= Rarity.EPIC.ordinal) 2 else 1
+            } else w.clipSize
+            newClip[0] = clipSize
         }
-        return copy(gunSlots = newGuns, clipAmmo = newClip)
+        return copy(gunSlots = newGuns, gunRarities = newRarities, clipAmmo = newClip)
     }
 
-    fun addGrenade(g: GrenadeType): Inventory {
+    fun addGrenade(g: GrenadeType, r: Rarity): Inventory {
         val newGrenades = grenadeSlots.toMutableList()
+        val newRarities = grenadeRarities.toMutableList()
         val freeIdx = newGrenades.indexOfFirst { it == null }
-        if (freeIdx >= 0) newGrenades[freeIdx] = g else newGrenades[0] = g
-        return copy(grenadeSlots = newGrenades)
+        if (freeIdx >= 0) {
+            newGrenades[freeIdx] = g
+            newRarities[freeIdx] = r
+        } else {
+            newGrenades[0] = g
+            newRarities[0] = r
+        }
+        return copy(grenadeSlots = newGrenades, grenadeRarities = newRarities)
     }
 
-    fun addArmor(a: ArmorType): Inventory = copy(armorSlot = a)
+    fun addArmor(a: ArmorType, r: Rarity): Inventory = copy(armorSlot = a, armorRarity = r)
 }
 
 // ─── Spieler ──────────────────────────────────────────────────────────────────
@@ -326,11 +358,15 @@ enum class ZoneType { SMOKE, SLOW_FIELD, HEAL_FIELD }
 data class BattleZone(
     val currentRadius: Float,
     val targetRadius: Float,
+    val startRadius: Float,
     val centerX: Float,
     val centerY: Float,
-    val shrinkRate: Float = 8f,    // px pro Sekunde
     val damagePerSec: Float = 5f,
-    var nextPhaseTimer: Float = 30f
+    val isShrinking: Boolean = false,
+    val phaseTimer: Float = 72f,   // Start-Verzögerung (~42s Laufzeit + 30s)
+    val waitDuration: Float = 20f,
+    val shrinkDuration: Float = 25f,
+    val phase: Int = 0
 ) {
     val effectiveRadius: Float get() = currentRadius
 }
@@ -358,7 +394,7 @@ data class GameState(
     val effectZones: List<EffectZone> = emptyList(),
     val groundItems: List<GroundItem> = emptyList(),
     val obstacles: List<Obstacle> = emptyList(),
-    val battleZone: BattleZone = BattleZone(2000f, 200f, 0f, 0f),
+    val battleZone: BattleZone = BattleZone(2000f, 200f, 200f, 0f, 0f),
     val meleeSwings: List<MeleeSwing> = emptyList(),
     val mapWidth: Float = 5500f,
     val mapHeight: Float = 5500f,
@@ -369,5 +405,6 @@ data class GameState(
     val cameraY: Float = 0f,
     val nextId: Int = 1000,
     val zoomLevel: Float = 1.8f,
-    val killFeed: List<String> = emptyList()
+    val killFeed: List<String> = emptyList(),
+    val spectatedPlayerId: Int? = null
 )

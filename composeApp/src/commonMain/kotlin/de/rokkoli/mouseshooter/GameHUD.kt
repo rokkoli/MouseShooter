@@ -1,9 +1,11 @@
 package de.rokkoli.mouseshooter
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -38,6 +40,7 @@ fun GameHUD(
     state: GameState,
     localPlayer: Player?,
     onArmorClick: () -> Unit = {},
+    onExitSpectate: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (localPlayer == null) return
@@ -55,6 +58,15 @@ fun GameHUD(
 
         // ── Bottom-Center: Inventar-Slots ─────────────────────────────────────
         InventoryBar(localPlayer, onArmorClick, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
+
+        // ── Spectator Overlay ─────────────────────────────────────────────────
+        if (!localPlayer.isAlive && !state.isGameOver) {
+            SpectatorOverlay(
+                state = state, 
+                onExitSpectate = onExitSpectate, 
+                modifier = Modifier.align(Alignment.Center).padding(top = 150.dp)
+            )
+        }
 
         // ── Bottom-Right: Minimap-Platzhalter (wird per Canvas gezeichnet) ────
         MinimapLabel(modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp))
@@ -119,12 +131,16 @@ private fun KillCounter(player: Player, modifier: Modifier) {
 @Composable
 fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
     val inv = player.inventory
-    val allSlots: List<Pair<String, Long?>> = buildList {
-        add(Pair(inv.meleeSlot?.label ?: "—", inv.meleeSlot?.color))
-        for (gun in inv.gunSlots) add(Pair(gun?.label ?: "—", gun?.color))
-        for (g in inv.grenadeSlots) add(Pair(g?.label ?: "—", g?.color))
+    val allSlots = buildList {
+        add(Triple(inv.meleeSlot?.label ?: "—", inv.meleeSlot?.color, inv.meleeRarity.glowColor))
+        inv.gunSlots.forEachIndexed { i, gun -> 
+            add(Triple(gun?.label ?: "—", gun?.color, if (gun != null) inv.gunRarities[i].glowColor else null))
+        }
+        inv.grenadeSlots.forEachIndexed { i, g -> 
+            add(Triple(g?.label ?: "—", g?.color, if (g != null) inv.grenadeRarities[i].glowColor else null))
+        }
         // Rüstung
-        add(Pair(inv.armorSlot?.label ?: "—", inv.armorSlot?.color))
+        add(Triple(inv.armorSlot?.label ?: "—", inv.armorSlot?.color, inv.armorRarity?.glowColor))
     }
 
     val clipAmmo = inv.clipAmmo
@@ -136,9 +152,10 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
         verticalAlignment = Alignment.Bottom
     ) {
         // Index: 0=Melee, 1-3=Guns, 4-5=Grenades, 6=Rüstung
-        allSlots.forEachIndexed { index, (label, color) ->
+        allSlots.forEachIndexed { index, (label, color, rarityColor) ->
             val isActive = index == inv.selectedSlotIndex
-            val slotColor = color?.let { Color(it) } ?: Color.Transparent
+            val itemColor = color?.let { Color(it) } ?: Color.Transparent
+            val rarityCol = rarityColor?.let { Color(it) } ?: Color.Transparent
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 // Slot-Nummer
@@ -152,9 +169,12 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
                 Box(
                     modifier = Modifier
                         .size(58.dp)
-                        .background(if (isActive) Color(0x4400CCFF) else SlotInactive, RoundedCornerShape(8.dp))
+                        .background(
+                            if (rarityCol != Color.Transparent) rarityCol.copy(alpha = 0.25f) else SlotInactive,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .then(if (isActive) Modifier.border(2.5.dp, Color.White, RoundedCornerShape(8.dp)) else Modifier)
                         .clip(RoundedCornerShape(8.dp))
-                        .then(if (isActive) Modifier.background(Color(0x2200AAFF), RoundedCornerShape(8.dp)) else Modifier)
                         .then(if (index == 6) Modifier.clickable { onArmorClick() } else Modifier),
                     contentAlignment = Alignment.Center
                 ) {
@@ -164,12 +184,12 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
                             Box(
                                 modifier = Modifier
                                     .size(12.dp)
-                                    .background(slotColor, RoundedCornerShape(3.dp))
+                                    .background(itemColor, RoundedCornerShape(3.dp))
                             )
                             Spacer(Modifier.height(3.dp))
                             Text(
                                 text = label.take(8),
-                                color = if (isActive) slotColor else slotColor.copy(alpha = 0.7f),
+                                color = if (isActive) Color.White else Color.White.copy(alpha = 0.7f),
                                 fontSize = 8.sp,
                                 textAlign = TextAlign.Center,
                                 lineHeight = 9.sp,
@@ -484,5 +504,40 @@ private fun controlRow(key: String, desc: String) {
             modifier = Modifier.width(160.dp)
         )
         Text(desc, color = Color(0xFF888899), fontSize = 12.sp)
+    }
+}
+@Composable
+private fun SpectatorOverlay(state: GameState, onExitSpectate: () -> Unit, modifier: Modifier) {
+    val target = state.players.firstOrNull { it.id == state.spectatedPlayerId }
+    val name = if (target != null) "Bot ${target.id}" else "Niemanden"
+    
+    Box(
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .padding(20.dp)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("DU BIST ELIMINIERT", color = Color.Red, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).background(Color.Red, CircleShape))
+                Spacer(Modifier.width(8.dp))
+                Text("ZUSCHAUERMODUS", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(12.dp))
+            Text("Du schaust gerade zu:", color = Color.Gray, fontSize = 14.sp)
+            Text(name, color = HudAccent, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onExitSpectate,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444455)),
+                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier.height(36.dp)
+            ) {
+                Text("ZUSCHAUEN BEENDEN", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }

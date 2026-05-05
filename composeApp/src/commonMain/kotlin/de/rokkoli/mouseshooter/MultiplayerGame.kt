@@ -57,6 +57,7 @@ fun MultiplayerGameScreen(
     var isLeftDown  by remember { mutableStateOf(false) }
     var wasLeftDown by remember { mutableStateOf(false) }
     var screenSize  by remember { mutableStateOf(Vec2(1280f, 800f)) }
+    var forceGameOver by remember { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
     var lastMark by remember { mutableStateOf(kotlin.time.TimeSource.Monotonic.markNow()) }
@@ -366,7 +367,7 @@ fun MultiplayerGameScreen(
             }
 
             // ── HUD ───────────────────────────────────────────────────────
-            if (!gs.isGameOver) {
+            if (!gs.isGameOver && !forceGameOver) {
                 GameHUD(
                     state = gs.copy(players = gs.players.map { p ->
                         p.copy(isLocalPlayer = p.id == myPlayerIndex)
@@ -385,7 +386,8 @@ fun MultiplayerGameScreen(
                                 connector.sendShoot(myPlayerIndex)
                             }
                         }
-                    }
+                    },
+                    onExitSpectate = { forceGameOver = true }
                 )
 
                 val spawningPlayer = localPlayer
@@ -437,14 +439,25 @@ fun MultiplayerGameScreen(
             }
 
             // ── Game Over ──────────────────────────────────────────────────
-            if (gs.isGameOver) {
+            if (gs.isGameOver || forceGameOver) {
                 GameOverScreen(
                     state = gs.copy(players = gs.players.map { p ->
                         p.copy(isLocalPlayer = p.id == myPlayerIndex)
                     }),
                     onRestart = {
-                        connector.disconnect()
-                        onBack()
+                        forceGameOver = false
+                        if (isHost) {
+                            // Host startet eine neue Runde mit allen aktuell verbundenen Spielern
+                            val numPlayers = connector.connectedPlayers
+                            val seed = kotlin.random.Random.nextInt()
+                            gameSeed = seed
+                            gameState = createMultiplayerInitialState(numPlayers, seed)
+                            connector.sendGameStart(numPlayers, seed)
+                        } else {
+                            // Client geht zurück in den Wartemodus
+                            gameState = null
+                            gameStarted = false
+                        }
                     }
                 )
             }
@@ -454,7 +467,22 @@ fun MultiplayerGameScreen(
                 modifier = Modifier.fillMaxSize().background(Color(0xFF0A1020)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("WARTE AUF SPIELSTART...", color = Color(0xFF00CCFF), fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("WARTE AUF SPIELSTART...", color = Color(0xFF00CCFF), fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(32.dp))
+                    Box(
+                        modifier = Modifier
+                            .border(1.dp, Color(0xFFAAAAAA), RoundedCornerShape(4.dp))
+                            .clickable { 
+                                connector.disconnect()
+                                onBack() 
+                            }
+                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("RAUM VERLASSEN", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFFAAAAAA))
+                    }
+                }
             }
         }
     }
@@ -468,8 +496,8 @@ fun MultiplayerGameScreen(
 
 /** Erzeugt den Multiplayer-Startzustand: Alle Spieler sind echte Spieler, keine Bots. */
 fun createMultiplayerInitialState(numPlayers: Int, seed: Int): GameState {
-    val mapW = 5500f
-    val mapH = 5500f
+    val mapW = 12000f
+    val mapH = 12000f
     val center = Vec2(mapW / 2, mapH / 2)
     val (obstacles, items) = MapGenerator.generate(mapW, mapH, kotlin.random.Random(seed))
 
@@ -495,7 +523,14 @@ fun createMultiplayerInitialState(numPlayers: Int, seed: Int): GameState {
 
     return GameState(
         players = players, groundItems = items, obstacles = obstacles,
-        battleZone = BattleZone(3000f, 150f, center.x, center.y, shrinkRate = 4f),
+        battleZone = BattleZone(
+            currentRadius = 10000f, 
+            targetRadius = 10000f, 
+            startRadius = 10000f, 
+            centerX = center.x, 
+            centerY = center.y,
+            damagePerSec = 4f
+        ),
         mapWidth = mapW, mapHeight = mapH,
         cameraX = center.x, cameraY = center.y,
         nextId = 2000, zoomLevel = 1.8f,
@@ -519,6 +554,18 @@ fun createGameSyncData(state: GameState): GameSyncData {
                 fireCooldown = p.fireCooldown,
                 velocityX = p.velocity.x,
                 velocityY = p.velocity.y,
+                meleeSlot = p.inventory.meleeSlot?.name,
+                gunSlots = p.inventory.gunSlots.map { it?.name },
+                grenadeSlots = p.inventory.grenadeSlots.map { it?.name },
+                armorSlot = p.inventory.armorSlot?.name,
+                clipAmmo = p.inventory.clipAmmo,
+                reserveAmmo = p.inventory.reserveAmmo.mapKeys { it.key.name },
+                meleeRarity = p.inventory.meleeRarity.ordinal,
+                gunRarities = p.inventory.gunRarities.map { it.ordinal },
+                grenadeRarities = p.inventory.grenadeRarities.map { it.ordinal },
+                armorRarity = p.inventory.armorRarity?.ordinal,
+                isReloading = p.isReloading,
+                reloadTimer = p.reloadTimer,
             )
         },
         projectiles = state.projectiles.map { proj ->
@@ -605,9 +652,23 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
             isAlive = sp.isAlive,
             isSpawning = sp.isSpawning,
             kills = sp.kills,
-            inventory = (existing?.inventory ?: Inventory()).copy(selectedSlotIndex = sp.selectedSlotIndex),
+            inventory = (existing?.inventory ?: Inventory()).copy(
+                selectedSlotIndex = sp.selectedSlotIndex,
+                meleeSlot = sp.meleeSlot?.let { WeaponType.valueOf(it) },
+                gunSlots = sp.gunSlots.map { it?.let { name -> WeaponType.valueOf(name) } },
+                grenadeSlots = sp.grenadeSlots.map { it?.let { name -> GrenadeType.valueOf(name) } },
+                armorSlot = sp.armorSlot?.let { ArmorType.valueOf(it) },
+                clipAmmo = sp.clipAmmo,
+                reserveAmmo = sp.reserveAmmo.mapKeys { AmmoType.valueOf(it.key) },
+                meleeRarity = Rarity.entries.getOrNull(sp.meleeRarity) ?: Rarity.COMMON,
+                gunRarities = sp.gunRarities.map { Rarity.entries.getOrNull(it) ?: Rarity.COMMON },
+                grenadeRarities = sp.grenadeRarities.map { Rarity.entries.getOrNull(it) ?: Rarity.COMMON },
+                armorRarity = sp.armorRarity?.let { Rarity.entries.getOrNull(it) }
+            ),
             fireCooldown = sp.fireCooldown,
             velocity = Vec2(sp.velocityX, sp.velocityY),
+            isReloading = sp.isReloading,
+            reloadTimer = sp.reloadTimer,
         )
     }
 

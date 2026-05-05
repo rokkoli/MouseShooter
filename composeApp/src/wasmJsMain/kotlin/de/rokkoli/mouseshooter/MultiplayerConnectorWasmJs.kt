@@ -70,6 +70,48 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                     val players = mutableListOf<PlayerSyncData>()
                     for (i in 0 until playersLen) {
                         val pObj = getJsArrayItem(playersArr, i)
+                        val gunSlotsArr = getJsArray(pObj, "gunSlots")
+                        val gunSlots = mutableListOf<String?>()
+                        for (j in 0 until getJsArrayLength(gunSlotsArr)) {
+                            val s = getJsArrayItem(gunSlotsArr, j)
+                            gunSlots.add(if (s == null) null else s.toString())
+                        }
+
+                        val grenadeSlotsArr = getJsArray(pObj, "grenadeSlots")
+                        val grenadeSlots = mutableListOf<String?>()
+                        for (j in 0 until getJsArrayLength(grenadeSlotsArr)) {
+                            val s = getJsArrayItem(grenadeSlotsArr, j)
+                            grenadeSlots.add(if (s == null) null else s.toString())
+                        }
+
+                        val clipAmmoArr = getJsArray(pObj, "clipAmmo")
+                        val clipAmmo = mutableListOf<Int>()
+                        for (j in 0 until getJsArrayLength(clipAmmoArr)) {
+                            clipAmmo.add(getJsIntAt(clipAmmoArr, j))
+                        }
+
+                        val reserveAmmoObj = getJsAny(pObj, "reserveAmmo")
+                        val reserveAmmo = mutableMapOf<String, Int>()
+                        if (reserveAmmoObj != null) {
+                            val keysArr = getJsKeys(reserveAmmoObj)
+                            for (j in 0 until getJsArrayLength(keysArr)) {
+                                val key = getJsArrayItem(keysArr, j).toString()
+                                reserveAmmo[key] = getJsInt(reserveAmmoObj, key)
+                            }
+                        }
+
+                        val gunRaritiesArr = getJsArray(pObj, "gunRarities")
+                        val gunRarities = mutableListOf<Int>()
+                        for (j in 0 until getJsArrayLength(gunRaritiesArr)) {
+                            gunRarities.add(getJsIntAt(gunRaritiesArr, j))
+                        }
+
+                        val grenadeRaritiesArr = getJsArray(pObj, "grenadeRarities")
+                        val grenadeRarities = mutableListOf<Int>()
+                        for (j in 0 until getJsArrayLength(grenadeRaritiesArr)) {
+                            grenadeRarities.add(getJsIntAt(grenadeRaritiesArr, j))
+                        }
+
                         players.add(PlayerSyncData(
                             id = getJsInt(pObj, "id"),
                             x = getJsFloat(pObj, "x"),
@@ -83,6 +125,18 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                             fireCooldown = getJsFloat(pObj, "fireCooldown"),
                             velocityX = getJsFloat(pObj, "velocityX"),
                             velocityY = getJsFloat(pObj, "velocityY"),
+                            meleeSlot = getJsString(pObj, "meleeSlot"),
+                            gunSlots = gunSlots,
+                            grenadeSlots = grenadeSlots,
+                            armorSlot = getJsString(pObj, "armorSlot"),
+                            clipAmmo = clipAmmo,
+                            reserveAmmo = reserveAmmo,
+                            meleeRarity = getJsInt(pObj, "meleeRarity"),
+                            gunRarities = gunRarities,
+                            grenadeRarities = grenadeRarities,
+                            armorRarity = if (getJsAny(pObj, "armorRarity") == null) null else getJsInt(pObj, "armorRarity"),
+                            isReloading = getJsBoolean(pObj, "isReloading"),
+                            reloadTimer = getJsFloat(pObj, "reloadTimer"),
                         ))
                     }
                     val projArr = getJsArray(dataAny, "projectiles")

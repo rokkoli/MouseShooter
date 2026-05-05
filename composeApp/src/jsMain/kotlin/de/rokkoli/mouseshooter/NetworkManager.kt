@@ -182,6 +182,18 @@ class NetworkManager {
             pObj.fireCooldown = p.fireCooldown
             pObj.velocityX = p.velocityX
             pObj.velocityY = p.velocityY
+            pObj.meleeSlot = p.meleeSlot
+            pObj.gunSlots = p.gunSlots.toTypedArray()
+            pObj.grenadeSlots = p.grenadeSlots.toTypedArray()
+            pObj.armorSlot = p.armorSlot
+            pObj.clipAmmo = p.clipAmmo.toTypedArray()
+            pObj.reserveAmmo = mapToJsObject(p.reserveAmmo)
+            pObj.meleeRarity = p.meleeRarity.ordinal
+            pObj.gunRarities = p.gunRarities.map { it.ordinal }.toTypedArray()
+            pObj.grenadeRarities = p.grenadeRarities.map { it.ordinal }.toTypedArray()
+            pObj.armorRarity = p.armorRarity?.ordinal
+            pObj.isReloading = p.isReloading
+            pObj.reloadTimer = p.reloadTimer
             pObj
         }.toTypedArray()
         msg.projectiles = data.projectiles.map { proj ->
@@ -303,4 +315,10 @@ class NetworkManager {
         val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         return (1..4).map { chars.random() }.joinToString("")
     }
+}
+
+fun mapToJsObject(map: Map<String, Int>): dynamic {
+    val obj = js("{}")
+    map.forEach { (k, v) -> obj[k] = v }
+    return obj
 }

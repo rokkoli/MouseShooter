@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.PathEffect
 import kotlin.math.*
 
 // ─── Hilfsfunktionen ────────────────────────────────────────────────────────
@@ -33,12 +34,12 @@ object GameRenderer {
         val zoom  = state.zoomLevel
 
         // ── Hintergrund: außerhalb der Map = dunkles Void ─────────────────────
-        drawRect(color = Color(0xFF060D06), size = Size(screenW, screenH))
+        drawRect(color = Color(0xFF121A12), size = Size(screenW, screenH))
 
         // Map-Fläche
         val mapLeft = (-camX) * zoom + screenW / 2
         val mapTop  = (-camY) * zoom + screenH / 2
-        drawRect(color = Color(0xFF0D1D0D), topLeft = Offset(mapLeft, mapTop),
+        drawRect(color = Color(0xFF2A422A), topLeft = Offset(mapLeft, mapTop),
             size = Size(state.mapWidth * zoom, state.mapHeight * zoom))
 
         // Gras-Raster (nur innerhalb Map)
@@ -295,31 +296,31 @@ object GameRenderer {
 
     // ── Map-Raster ────────────────────────────────────────────────────────────
     private fun DrawScope.drawMapGrid(camX: Float, camY: Float, screenW: Float, screenH: Float, state: GameState, zoom: Float) {
-        val gridSize = 200f * zoom
-        // Modulo muss immer positiv sein – Kotlin % kann negativ sein
-        val rawOffX = (-camX * zoom + screenW / 2) % gridSize
-        val rawOffY = (-camY * zoom + screenH / 2) % gridSize
-        val offsetX = if (rawOffX < 0) rawOffX + gridSize else rawOffX
-        val offsetY = if (rawOffY < 0) rawOffY + gridSize else rawOffY
+        val spacing = 250f * zoom
+        val mapLeft = (-camX) * zoom + screenW / 2
+        val mapTop  = (-camY) * zoom + screenH / 2
+        val mapRight = mapLeft + state.mapWidth * zoom
+        val mapBottom = mapTop + state.mapHeight * zoom
 
-        var gx = offsetX - gridSize
-        while (gx <= screenW + gridSize) {
-            var gy = offsetY - gridSize
-            while (gy <= screenH + gridSize) {
-                // Weltposition dieser Gitterzelle
-                val wx = camX + (gx - screenW / 2) / zoom
-                val wy = camY + (gy - screenH / 2) / zoom
-                // Nur zeichnen wenn innerhalb der Map
-                if (wx >= 0 && wx < state.mapWidth && wy >= 0 && wy < state.mapHeight) {
-                    val cx = (wx / 200f).toInt(); val cy = (wy / 200f).toInt()
-                    val color = if ((cx + cy) % 2 == 0) Color(0xFF1E341E) else Color(0xFF1A2E1A)
-                    drawRect(color = color, topLeft = Offset(gx, gy), size = Size(gridSize, gridSize))
-                }
-                gy += gridSize
+        val lineCol = Color(0xFF345234)
+        
+        var x = mapLeft
+        while (x <= mapRight + 1f) {
+            if (x in -1f..screenW + 1f) {
+                drawLine(lineCol, Offset(x, mapTop.coerceIn(0f, screenH)), Offset(x, mapBottom.coerceIn(0f, screenH)), 1f * zoom)
             }
-            gx += gridSize
+            x += spacing
+        }
+        
+        var y = mapTop
+        while (y <= mapBottom + 1f) {
+            if (y in -1f..screenH + 1f) {
+                drawLine(lineCol, Offset(mapLeft.coerceIn(0f, screenW), y), Offset(mapRight.coerceIn(0f, screenW), y), 1f * zoom)
+            }
+            y += spacing
         }
     }
+
 
     // ── Icons ─────────────────────────────────────────────────────────────────
     private fun DrawScope.drawWeaponIcon(center: Offset, weapon: WeaponType, radius: Float) {
@@ -378,8 +379,24 @@ object GameRenderer {
         }
 
         val bz = state.battleZone
+        val bzCenter = Offset(mapX + bz.centerX * scaleX, mapY + bz.centerY * scaleY)
+        
+        // Aktuelle Zone (Rot)
         drawCircle(color = Color(0xFFFF2200).copy(alpha = 0.4f), radius = bz.currentRadius * scaleX,
-            center = Offset(mapX + bz.centerX * scaleX, mapY + bz.centerY * scaleY), style = Stroke(1f))
+            center = bzCenter, style = Stroke(1.5f))
+            
+        // Nächste Zone (Gestrichelt Weiß)
+        if (bz.currentRadius > bz.targetRadius || !bz.isShrinking) {
+            drawCircle(
+                color = Color.White.copy(alpha = 0.6f),
+                radius = bz.targetRadius * scaleX,
+                center = bzCenter,
+                style = Stroke(
+                    width = 1f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f))
+                )
+            )
+        }
 
         for (player in state.players) {
             if (!player.isAlive) continue

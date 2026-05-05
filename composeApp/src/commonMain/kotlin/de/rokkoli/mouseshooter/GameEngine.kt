@@ -16,12 +16,12 @@ object MapGenerator {
         val items = mutableListOf<GroundItem>()
         var idCounter = 0
         val center = Vec2(mapW / 2, mapH / 2)
-        val cols = 12
-        val rows = 12
-        val cellW = (mapW - 800f) / cols
-        val cellH = (mapH - 800f) / rows
-        val startX = 400f
-        val startY = 400f
+        val cols = (mapW / 750f).toInt().coerceAtLeast(8)
+        val rows = (mapH / 750f).toInt().coerceAtLeast(8)
+        val cellW = (mapW - 1000f) / cols
+        val cellH = (mapH - 1000f) / rows
+        val startX = 500f
+        val startY = 500f
 
         for (row in 0 until rows) {
             for (col in 0 until cols) {
@@ -68,69 +68,96 @@ object MapGenerator {
             }
         }
 
+        // ─── Map-Begrenzung (Wände am Rand) ──────────────────────────────────
+        val wallThickness = 150f
+        obstacles.add(Obstacle(Vec2(-wallThickness, -wallThickness), mapW + 2 * wallThickness, wallThickness, 0xFF222222L)) // Oben
+        obstacles.add(Obstacle(Vec2(-wallThickness, mapH), mapW + 2 * wallThickness, wallThickness, 0xFF222222L))           // Unten
+        obstacles.add(Obstacle(Vec2(-wallThickness, 0f), wallThickness, mapH, 0xFF222222L))                               // Links
+        obstacles.add(Obstacle(Vec2(mapW, 0f), wallThickness, mapH, 0xFF222222L))                                          // Rechts
+
         val maxDist = sqrt(mapW * mapW + mapH * mapH) / 2f
 
-        // Waffen: 25 Stück, min. MIN_WEAPON_SPAWN_DIST vom Zentrum
-        repeat(25) {
+        // ─── Loot-Pool System ──────────────────────────────────────────────
+        
+        // 1. Garantierte Mindestmenge (genug für ca. 10 Spieler)
+        val guaranteedWeapons = 15
+        val guaranteedAmmo = 20
+        val guaranteedGrenades = 10
+        val guaranteedMedkits = 10
+        val guaranteedArmor = 8
+
+        fun spawnItem(type: String) {
             val angle = random.nextFloat() * 2 * PI.toFloat()
-            val dist  = MIN_WEAPON_SPAWN_DIST + random.nextFloat() * (maxDist * 0.88f - MIN_WEAPON_SPAWN_DIST)
-            val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
+            // sqrt(random) für gleichmäßige Verteilung in der Fläche (verhindert Clustering in der Mitte)
+            val baseDist = sqrt(random.nextFloat()) * (maxDist * 0.9f)
+            
+            // Waffen und Rüstung nicht direkt im Zentrum spawnen
+            val dist = if (type == "weapon" || type == "armor") {
+                MIN_WEAPON_SPAWN_DIST + (baseDist * 0.8f)
+            } else {
+                baseDist.coerceAtLeast(300f)
+            }
+            
+            val pos = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
             val rarity = rarityFromDistance(dist, maxDist, random)
-            val pool = if (rarity.ordinal >= Rarity.EPIC.ordinal)
-                listOf(WeaponType.SMG, WeaponType.FLAMETHROWER, WeaponType.ROCKET_LAUNCHER, WeaponType.SHOTGUN, WeaponType.SNIPER, WeaponType.MINIGUN)
-            else if (rarity.ordinal >= Rarity.RARE.ordinal)
-                listOf(WeaponType.SMG, WeaponType.SHOTGUN)
-            else listOf(WeaponType.PISTOL, WeaponType.KNIFE, WeaponType.LONG_KNIFE, WeaponType.SHOTGUN)
-            items.add(GroundItem.WeaponItem(idCounter++, pos, pool.random(random), rarity))
+            
+            when (type) {
+                "weapon" -> {
+                    val pool = if (rarity.ordinal >= Rarity.EPIC.ordinal)
+                        listOf(WeaponType.SMG, WeaponType.FLAMETHROWER, WeaponType.ROCKET_LAUNCHER, WeaponType.SHOTGUN, WeaponType.SNIPER, WeaponType.MINIGUN)
+                    else if (rarity.ordinal >= Rarity.RARE.ordinal)
+                        listOf(WeaponType.SMG, WeaponType.SHOTGUN)
+                    else listOf(WeaponType.PISTOL, WeaponType.KNIFE, WeaponType.LONG_KNIFE, WeaponType.SHOTGUN)
+                    items.add(GroundItem.WeaponItem(idCounter++, pos, pool.random(random), rarity))
+                }
+                "grenade" -> items.add(GroundItem.GrenadeItem(idCounter++, pos, GrenadeType.entries.filter { it != GrenadeType.MEDKIT }.random(random), rarity))
+                "medkit" -> items.add(GroundItem.GrenadeItem(idCounter++, pos, GrenadeType.MEDKIT, rarity))
+                "armor" -> items.add(GroundItem.ArmorItem(idCounter++, pos, ArmorType.entries.random(random), rarity))
+                "ammo" -> {
+                    val ammoType = AmmoType.entries.random(random)
+                    val amt = when(ammoType) {
+                        AmmoType.LIGHT -> 30
+                        AmmoType.HEAVY -> 10
+                        AmmoType.SHELLS -> 8
+                        AmmoType.ROCKETS -> 2
+                        AmmoType.FUEL -> 100
+                    }
+                    items.add(GroundItem.AmmoItem(idCounter++, pos, ammoType, amt, rarity))
+                }
+            }
         }
 
-        // Granaten: 8 Stück
-        repeat(8) {
-            val angle = random.nextFloat() * 2 * PI.toFloat()
-            val dist  = 900f + random.nextFloat() * (maxDist * 0.85f - 900f)
-            val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
-            items.add(GroundItem.GrenadeItem(idCounter++, pos, GrenadeType.values().random(random), rarityFromDistance(dist, maxDist, random)))
+        // Spawne Garantierte Items
+        repeat(guaranteedWeapons) { spawnItem("weapon") }
+        repeat(guaranteedAmmo) { spawnItem("ammo") }
+        repeat(guaranteedGrenades) { spawnItem("grenade") }
+        repeat(guaranteedMedkits) { spawnItem("medkit") }
+        repeat(guaranteedArmor) { spawnItem("armor") }
+
+        // 2. Der Rest wird "ausgelost" (Zusätzlicher Lootpool)
+        // Skaliere die Item-Anzahl mit der Map-Größe (ca. 1 Item pro 1.000.000 pixel^2)
+        val mapArea = mapW * mapH
+        val baseAdditional = (mapArea / 1000000f).toInt().coerceIn(50, 400)
+        val additionalItems = baseAdditional + random.nextInt(baseAdditional / 2)
+        repeat(additionalItems) {
+            val r = random.nextFloat()
+            val type = when {
+                r < 0.35f -> "weapon"  // 35% Chance Waffe
+                r < 0.70f -> "ammo"    // 35% Chance Munition
+                r < 0.82f -> "grenade" // 12% Chance Granate
+                r < 0.92f -> "medkit"  // 10% Chance Medkit
+                else      -> "armor"   // 8% Chance Rüstung
+            }
+            spawnItem(type)
         }
 
-        // Rüstungen: 5 Stück
-        repeat(5) {
-            val angle = random.nextFloat() * 2 * PI.toFloat()
-            val dist  = MIN_WEAPON_SPAWN_DIST + random.nextFloat() * (maxDist * 0.8f - MIN_WEAPON_SPAWN_DIST)
-            val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
-            items.add(GroundItem.ArmorItem(idCounter++, pos, ArmorType.values().random(random), rarityFromDistance(dist, maxDist, random)))
-        }
-
-        // Nahkampf-Waffen etwas näher – für frühe Engagement
+        // Nahkampf-Waffen (wie bisher als kleiner Bonus im Zentrum)
         for (i in 0..2) {
             val a = i * (2 * PI.toFloat() / 3)
             val d = 700f + random.nextFloat() * 400f
             val pos = Vec2(center.x + cos(a) * d, center.y + sin(a) * d).clampToMap(mapW, mapH)
             items.add(GroundItem.WeaponItem(idCounter++, pos,
                 listOf(WeaponType.KNIFE, WeaponType.LONG_KNIFE, WeaponType.BOXING_GLOVES).random(random), Rarity.COMMON))
-        }
-
-        // Medkits: 12 Stück als Granaten
-        repeat(12) {
-            val angle = random.nextFloat() * 2 * PI.toFloat()
-            val dist  = 600f + random.nextFloat() * (maxDist * 0.9f - 600f)
-            val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
-            items.add(GroundItem.GrenadeItem(idCounter++, pos, GrenadeType.MEDKIT, rarityFromDistance(dist, maxDist, random)))
-        }
-
-        // Munition: 20 Stück
-        repeat(20) {
-            val angle = random.nextFloat() * 2 * PI.toFloat()
-            val dist  = 500f + random.nextFloat() * (maxDist * 0.9f - 500f)
-            val pos   = Vec2(center.x + cos(angle) * dist, center.y + sin(angle) * dist).clampToMap(mapW, mapH)
-            val type = AmmoType.values().random(random)
-            val amt = when(type) {
-                AmmoType.LIGHT -> 30
-                AmmoType.HEAVY -> 10
-                AmmoType.SHELLS -> 8
-                AmmoType.ROCKETS -> 2
-                AmmoType.FUEL -> 100
-            }
-            items.add(GroundItem.AmmoItem(idCounter++, pos, type, amt, rarityFromDistance(dist, maxDist, random)))
         }
 
         return Pair(obstacles, items)
@@ -141,8 +168,8 @@ fun Vec2.clampToMap(w: Float, h: Float) = Vec2(x.coerceIn(50f, w - 50f), y.coerc
 
 // ─── Initial-State ────────────────────────────────────────────────────────────
 fun createInitialState(): GameState {
-    val mapW = 9000f
-    val mapH = 9000f
+    val mapW = 15000f
+    val mapH = 15000f
     val center = Vec2(mapW / 2, mapH / 2)
     val (obstacles, items) = MapGenerator.generate(mapW, mapH)
 
@@ -172,7 +199,14 @@ fun createInitialState(): GameState {
 
     return GameState(
         players = players, groundItems = items, obstacles = obstacles,
-        battleZone = BattleZone(4000f, 150f, center.x, center.y, shrinkRate = 4f),
+        battleZone = BattleZone(
+            currentRadius = 12000f, 
+            targetRadius = 12000f, 
+            startRadius = 12000f, 
+            centerX = center.x, 
+            centerY = center.y,
+            damagePerSec = 4f
+        ),
         mapWidth = mapW, mapHeight = mapH,
         cameraX = center.x, cameraY = center.y,
         nextId = 2000, zoomLevel = 1.8f
@@ -223,11 +257,13 @@ object GameEngine {
             }
             // 2) Drop Loot wenn gestorben
             if (!upd.isAlive && !upd.hasDroppedLoot) {
-                upd.inventory.gunSlots.filterNotNull().forEach { w ->
-                    nextItems.add(GroundItem.WeaponItem(nId++, upd.pos + Vec2(Random.nextFloat()*40-20, Random.nextFloat()*40-20), w, Rarity.COMMON))
+                upd.inventory.gunSlots.forEachIndexed { i, w ->
+                    if (w != null) {
+                        nextItems.add(GroundItem.WeaponItem(nId++, upd.pos + Vec2(Random.nextFloat()*40-20, Random.nextFloat()*40-20), w, upd.inventory.gunRarities[i]))
+                    }
                 }
                 if (upd.inventory.meleeSlot != WeaponType.FISTS && upd.inventory.meleeSlot != null) {
-                    nextItems.add(GroundItem.WeaponItem(nId++, upd.pos + Vec2(Random.nextFloat()*40-20, Random.nextFloat()*40-20), upd.inventory.meleeSlot!!, Rarity.COMMON))
+                    nextItems.add(GroundItem.WeaponItem(nId++, upd.pos + Vec2(Random.nextFloat()*40-20, Random.nextFloat()*40-20), upd.inventory.meleeSlot!!, upd.inventory.meleeRarity))
                 }
                 upd = upd.copy(hasDroppedLoot = true)
             }
@@ -257,9 +293,26 @@ object GameEngine {
             s = s.copy(killFeed = updatedFeed)
         }
 
-        // Kamera
-        val local = s.players.firstOrNull { it.isLocalPlayer && it.isAlive }
-        if (local != null) s = s.copy(cameraX = local.pos.x, cameraY = local.pos.y)
+        // ── Kamera-Steuerung (Spectating) ─────────────────────────────────────
+        val localP = s.players.firstOrNull { it.isLocalPlayer }
+        val cameraTarget = if (localP?.isAlive == true) {
+            localP
+        } else {
+            // Wenn der lokale Spieler tot ist, spectate jemanden anders
+            var specTarget = s.players.firstOrNull { it.id == s.spectatedPlayerId && it.isAlive }
+            if (specTarget == null) {
+                // Suche neuen lebenden Spieler zum Zuschauen
+                specTarget = s.players.firstOrNull { it.isAlive && it.id != localP?.id }
+                if (specTarget != null) {
+                    s = s.copy(spectatedPlayerId = specTarget.id)
+                }
+            }
+            specTarget ?: localP // Fallback zum eigenen Todesort
+        }
+
+        if (cameraTarget != null) {
+            s = s.copy(cameraX = cameraTarget.pos.x, cameraY = cameraTarget.pos.y)
+        }
 
         // Game Over
         val alive = s.players.filter { it.isAlive }
@@ -303,16 +356,23 @@ object GameEngine {
                 newIsReloading = false
                 val activeWeapon = p.inventory.activeWeapon
                 if (activeWeapon != null && activeWeapon.ammoType != null) {
+                    val slotIdx = p.inventory.selectedSlotIndex - 1
+                    val rarity = p.inventory.gunRarities.getOrNull(slotIdx) ?: Rarity.COMMON
                     val ammoType = activeWeapon.ammoType
                     val reserve = p.inventory.reserveAmmo[ammoType] ?: 0
-                    val needed = activeWeapon.clipSize - (p.inventory.clipAmmo.getOrNull(p.inventory.selectedSlotIndex - 1) ?: 0)
+                    
+                    val actualClipSize = if (activeWeapon == WeaponType.SHOTGUN) {
+                        if (rarity.ordinal >= Rarity.EPIC.ordinal) 2 else 1
+                    } else activeWeapon.clipSize
+                    
+                    val current = p.inventory.clipAmmo.getOrNull(slotIdx) ?: 0
+                    val needed = actualClipSize - current
                     val toReload = reserve.coerceAtMost(needed)
                     
                     if (toReload > 0) {
                         val newReserves = p.inventory.reserveAmmo.toMutableMap()
                         newReserves[ammoType] = reserve - toReload
                         val newClips = p.inventory.clipAmmo.toMutableList()
-                        val slotIdx = p.inventory.selectedSlotIndex - 1
                         if (slotIdx in 0..2) {
                             newClips[slotIdx] += toReload
                         }
@@ -367,18 +427,33 @@ object GameEngine {
         val players = state.players.toMutableList()
 
         for (proj in state.projectiles) {
-            val p = proj.copy(pos = proj.pos + proj.velocity * dt, lifeTime = proj.lifeTime - dt)
-            fun addExp() { if (p.isExplosive) newExp.add(Explosion(p.pos, p.explosionRadius, damage = p.damage)) }
-            if (p.lifeTime <= 0f)                                                  { addExp(); continue }
-            if (state.obstacles.any { it.intersectsCircle(p.pos, p.radius) })     { addExp(); continue }
-            if (p.pos.x < 0 || p.pos.x > state.mapWidth || p.pos.y < 0 || p.pos.y > state.mapHeight) { addExp(); continue }
+            val oldPos = proj.pos
+            val newPos = (oldPos + proj.velocity * dt)
+            val p = proj.copy(pos = newPos, lifeTime = proj.lifeTime - dt)
+            
+            fun addExp(at: Vec2) { if (p.isExplosive) newExp.add(Explosion(at, p.explosionRadius, damage = p.damage)) }
+            
+            if (p.lifeTime <= 0f) { addExp(newPos); continue }
+            
+            // Kollision mit Hindernissen auf dem Pfad
+            val hitObstacle = state.obstacles.firstOrNull { it.intersectsSegment(oldPos, newPos, p.radius) }
+            if (hitObstacle != null) {
+                addExp(newPos) // Einfachheitshalber neue Position für Explosion
+                continue
+            }
+            
+            if (newPos.x < 0 || newPos.x > state.mapWidth || newPos.y < 0 || newPos.y > state.mapHeight) { 
+                addExp(newPos); continue 
+            }
+            
             var hit = false
             for (i in players.indices) {
                 val t = players[i]; if (!t.isAlive || t.isSpawning || t.id == p.ownerId) continue
-                if (t.pos.distanceTo(p.pos) < PLAYER_RADIUS + p.radius) {
+                // Prüfe ob Pfad den Spieler schneidet
+                if (intersectsSegmentCircle(oldPos, newPos, t.pos, PLAYER_RADIUS + p.radius)) {
                     val newHp = t.hp - p.damage
                     players[i] = t.copy(hp = newHp.coerceAtLeast(0f), isAlive = newHp > 0f, lastDamagedBy = p.ownerId)
-                    addExp(); hit = true; break
+                    addExp(newPos); hit = true; break
                 }
             }
             if (!hit) remaining.add(p)
@@ -519,8 +594,39 @@ object GameEngine {
 
     // ── Kampfzone ─────────────────────────────────────────────────────────────
     private fun updateBattleZone(state: GameState, dt: Float): GameState {
-        val bz = state.battleZone
-        return state.copy(battleZone = bz.copy(currentRadius = (bz.currentRadius - bz.shrinkRate * dt).coerceAtLeast(bz.targetRadius)))
+        var bz = state.battleZone
+        var newPhaseTimer = bz.phaseTimer - dt
+        
+        if (newPhaseTimer <= 0) {
+            if (!bz.isShrinking) {
+                // Von Warten auf Schrumpfen wechseln
+                val nextTarget = if (bz.phase == 0) (bz.currentRadius * 0.6f) else (bz.currentRadius * 0.5f)
+                bz = bz.copy(
+                    isShrinking = true, 
+                    phaseTimer = bz.shrinkDuration, 
+                    startRadius = bz.currentRadius,
+                    targetRadius = nextTarget.coerceAtLeast(150f)
+                )
+            } else {
+                // Von Schrumpfen auf Warten wechseln (Nächste Phase vorbereiten)
+                bz = bz.copy(
+                    isShrinking = false, 
+                    phaseTimer = bz.waitDuration, 
+                    currentRadius = bz.targetRadius,
+                    phase = bz.phase + 1
+                )
+            }
+        } else {
+            var newCurrentRadius = bz.currentRadius
+            if (bz.isShrinking) {
+                // Interpoliere Radius während des Schrumpfens
+                val progress = 1f - (newPhaseTimer / bz.shrinkDuration)
+                newCurrentRadius = bz.startRadius + (bz.targetRadius - bz.startRadius) * progress.coerceIn(0f, 1f)
+            }
+            bz = bz.copy(phaseTimer = newPhaseTimer, currentRadius = newCurrentRadius)
+        }
+        
+        return state.copy(battleZone = bz)
     }
     private fun checkZoneDamage(state: GameState, dt: Float): GameState {
         val bz = state.battleZone; val center = Vec2(bz.centerX, bz.centerY)
@@ -592,7 +698,7 @@ object GameEngine {
                     val toItem = nearestWeaponItem.pos - bot.pos
                     if (toItem.length() < PLAYER_RADIUS + 50f) {
                         // aufheben
-                        bot = bot.copy(inventory = bot.inventory.addWeapon(nearestWeaponItem.weaponType).copy(selectedSlotIndex = 1))
+                        bot = bot.copy(inventory = bot.inventory.addWeapon(nearestWeaponItem.weaponType, nearestWeaponItem.rarity).copy(selectedSlotIndex = 1))
                         updatedGroundItems.removeAll { it.id == nearestWeaponItem.id }
                     } else {
                         val dir = (toItem + separation).normalized()
@@ -688,11 +794,9 @@ object GameEngine {
                         ))
                         bot = bot.copy(fireCooldown = 1f / activeWeapon.fireRate)
                     } else {
-                        // Nachladen triggern
-                        val reserve = bot.inventory.reserveAmmo[activeWeapon.ammoType] ?: 0
-                        if (reserve > 0) {
-                            bot = bot.copy(isReloading = true, reloadTimer = activeWeapon.reloadTime)
-                        }
+                        val slotIdx = bot.inventory.selectedSlotIndex - 1
+                        val rarity = bot.inventory.gunRarities.getOrNull(slotIdx) ?: Rarity.COMMON
+                        bot = bot.copy(isReloading = true, reloadTimer = activeWeapon.reloadTime * rarity.reloadMod)
                     }
                 }
             }
@@ -764,45 +868,45 @@ object GameEngine {
     // ── Schießen / Granate per LMB ────────────────────────────────────────────
     fun shoot(state: GameState, playerId: Int): GameState {
         val player = state.players.firstOrNull { it.id == playerId } ?: return state
-        if (!player.isAlive || player.isSpawning) return state
+        if (!player.isAlive || player.isSpawning || player.isReloading || player.fireCooldown > 0f) return state
 
         val inv = player.inventory
         if (inv.selectedSlotIndex == 6) return activateArmorAbility(state, playerId)
-        
-        if (player.fireCooldown > 0f) return state
         if (inv.selectedSlotIndex in 4..5) return throwGrenadeToMouse(state, playerId)
 
         val weapon = inv.activeWeapon ?: return state
-        if (player.isReloading) return state
+        val rarity = when (inv.selectedSlotIndex) {
+            0 -> inv.meleeRarity
+            in 1..3 -> inv.gunRarities.getOrNull(inv.selectedSlotIndex - 1) ?: Rarity.COMMON
+            else -> Rarity.COMMON
+        }
 
-        // Munition prüfen (außer Nahkampf)
         if (!weapon.isMelee) {
             val clipIdx = inv.selectedSlotIndex - 1
             val currentAmmo = inv.clipAmmo.getOrNull(clipIdx) ?: 0
             if (currentAmmo <= 0) {
-                // Auto-Reload triggern
-                val ammoType = weapon.ammoType
-                val reserve = inv.reserveAmmo[ammoType] ?: 0
+                val reserve = inv.reserveAmmo[weapon.ammoType] ?: 0
                 if (reserve > 0) {
                     return state.copy(players = state.players.map {
-                        if (it.id == playerId) it.copy(isReloading = true, reloadTimer = weapon.reloadTime) else it
+                        if (it.id == playerId) it.copy(isReloading = true, reloadTimer = weapon.reloadTime * rarity.reloadMod) else it
                     })
                 }
-                return state // Keine Munition mehr
+                return state
             }
         }
 
         var newState = state; var nextId = state.nextId
+        val damage = weapon.damage * rarity.damageMod
+        val fireRate = weapon.fireRate * rarity.fireRateMod
 
         if (weapon.isMelee) {
             val dir = Vec2(cos(player.rotation), sin(player.rotation))
             val isLeft = !player.lastMeleeLeft
             newState = newState.copy(
-                meleeSwings = newState.meleeSwings + MeleeSwing(playerId, weapon, isLeft, player.pos, dir, weapon.range, weapon.damage, weapon.knockback),
+                meleeSwings = newState.meleeSwings + MeleeSwing(playerId, weapon, isLeft, player.pos, dir, weapon.range, damage, weapon.knockback),
                 players = newState.players.map { if (it.id == playerId) it.copy(lastMeleeLeft = isLeft) else it }
             )
         } else {
-            // Munition verbrauchen
             val clipIdx = inv.selectedSlotIndex - 1
             val newClips = inv.clipAmmo.toMutableList()
             if (clipIdx in newClips.indices) newClips[clipIdx] = (newClips[clipIdx] - 1).coerceAtLeast(0)
@@ -819,13 +923,14 @@ object GameEngine {
                 newState = newState.copy(projectiles = newState.projectiles + Projectile(
                     id = nextId++, ownerId = playerId,
                     pos = player.pos + bDir * (PLAYER_RADIUS + weapon.bulletRadius + 2f),
-                    velocity = bDir * weapon.bulletSpeed, damage = weapon.damage, radius = weapon.bulletRadius, color = weapon.color,
+                    velocity = bDir * weapon.bulletSpeed, damage = damage, radius = weapon.bulletRadius, color = weapon.color,
                     lifeTime = weapon.range / weapon.bulletSpeed, maxLifeTime = weapon.range / weapon.bulletSpeed,
                     isExplosive = weapon == WeaponType.ROCKET_LAUNCHER, explosionRadius = if (weapon == WeaponType.ROCKET_LAUNCHER) 150f else 0f
                 ))
             }
         }
-        val cd = 1f / weapon.fireRate
+        
+        val cd = 1f / fireRate
         return newState.copy(players = newState.players.map { if (it.id == playerId) it.copy(fireCooldown = cd) else it }, nextId = nextId)
     }
 
@@ -870,40 +975,29 @@ object GameEngine {
                 if (item.weaponType.isMelee) {
                     val oldW = player.inventory.meleeSlot
                     if (oldW != WeaponType.FISTS && oldW != null) {
-                        droppedItem = GroundItem.WeaponItem(idCounter++, dropPos, oldW, Rarity.COMMON)
+                        droppedItem = GroundItem.WeaponItem(idCounter++, dropPos, oldW, player.inventory.meleeRarity)
                     }
-                    player.inventory.copy(meleeSlot = item.weaponType)
                 } else {
-                    val newGuns = player.inventory.gunSlots.toMutableList()
-                    val freeIdx = newGuns.indexOfFirst { it == null }
-                    if (freeIdx >= 0) {
-                        newGuns[freeIdx] = item.weaponType
-                    } else {
-                        val swapIdx = if (player.inventory.selectedSlotIndex in 1..3) player.inventory.selectedSlotIndex - 1 else 0
-                        droppedItem = GroundItem.WeaponItem(idCounter++, dropPos, newGuns[swapIdx]!!, Rarity.COMMON)
-                        newGuns[swapIdx] = item.weaponType
+                    val swapIdx = if (player.inventory.selectedSlotIndex in 1..3) player.inventory.selectedSlotIndex - 1 else 0
+                    if (player.inventory.gunSlots.all { it != null }) {
+                        droppedItem = GroundItem.WeaponItem(idCounter++, dropPos, player.inventory.gunSlots[swapIdx]!!, player.inventory.gunRarities[swapIdx])
                     }
-                    player.inventory.copy(gunSlots = newGuns)
                 }
+                player.inventory.addWeapon(item.weaponType, item.rarity)
             }
             is GroundItem.GrenadeItem -> {
-                val newGrenades = player.inventory.grenadeSlots.toMutableList()
-                val freeIdx = newGrenades.indexOfFirst { it == null }
-                if (freeIdx >= 0) {
-                    newGrenades[freeIdx] = item.grenadeType
-                } else {
+                if (player.inventory.grenadeSlots.all { it != null }) {
                     val swapIdx = if (player.inventory.selectedSlotIndex in 4..5) player.inventory.selectedSlotIndex - 4 else 0
-                    droppedItem = GroundItem.GrenadeItem(idCounter++, dropPos, newGrenades[swapIdx]!!, Rarity.COMMON)
-                    newGrenades[swapIdx] = item.grenadeType
+                    droppedItem = GroundItem.GrenadeItem(idCounter++, dropPos, player.inventory.grenadeSlots[swapIdx]!!, player.inventory.grenadeRarities[swapIdx])
                 }
-                player.inventory.copy(grenadeSlots = newGrenades)
+                player.inventory.addGrenade(item.grenadeType, item.rarity)
             }
             is GroundItem.ArmorItem   -> {
                 val oldArmor = player.inventory.armorSlot
                 if (oldArmor != null) {
-                    droppedItem = GroundItem.ArmorItem(idCounter++, dropPos, oldArmor, Rarity.COMMON)
+                    droppedItem = GroundItem.ArmorItem(idCounter++, dropPos, oldArmor, player.inventory.armorRarity ?: Rarity.COMMON)
                 }
-                player.inventory.copy(armorSlot = item.armorType)
+                player.inventory.addArmor(item.armorType, item.rarity)
             }
             is GroundItem.AmmoItem -> {
                 val newReserves = player.inventory.reserveAmmo.toMutableMap()
@@ -962,6 +1056,21 @@ object GameEngine {
             result = if (d < 0.0001f) result + Vec2(radius + 1f, 0f) else Vec2(cx, cy) + diff.normalized() * (radius + 1f)
         }
         return result
+    }
+
+    private fun intersectsSegmentCircle(p1: Vec2, p2: Vec2, center: Vec2, radius: Float): Boolean {
+        val d = p2 - p1
+        val f = p1 - center
+        val a = d.dot(d)
+        if (a < 0.0001f) return p1.distanceTo(center) < radius
+        val b = 2 * f.dot(d)
+        val c = f.dot(f) - radius * radius
+        var discriminant = b * b - 4 * a * c
+        if (discriminant < 0) return false
+        discriminant = sqrt(discriminant)
+        val t1 = (-b - discriminant) / (2 * a)
+        val t2 = (-b + discriminant) / (2 * a)
+        return (t1 in 0f..1f) || (t2 in 0f..1f) || (t1 < 0f && t2 > 1f)
     }
 }
 
