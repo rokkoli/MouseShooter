@@ -99,6 +99,7 @@ data class PlayerSyncData(
     val armorRarity: Int?,
     val isReloading: Boolean = false,
     val reloadTimer: Float = 0f,
+    val spawnTimer: Float = 0f,
 )
 
 /** Projectile sync data. */

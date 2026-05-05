@@ -35,7 +35,7 @@ enum class WeaponType(
     FLAMETHROWER("Flammenwerfer", 3f, 30f, 300f, 3f, 250f, 0xFFFF4400, false, 0f, AmmoType.FUEL, 100, 3.0f),
     ROCKET_LAUNCHER("Raketenwerfer", 35f, 0.5f, 350f, 8f, 900f, 0xFFFF8800, false, 0f, AmmoType.ROCKETS, 1, 3.5f),
     MINIGUN("Minigun", 5f, 14f, 1100f, 2f, 750f, 0xFF4455FF, false, 0f, AmmoType.LIGHT, 100, 5.0f),
-    SNIPER("Sniper", 150f, 0.1f, 4000f, 2f, 10000f, 0xFFFF0033, false, 0f, AmmoType.HEAVY, 5, 4.0f);
+    SNIPER("Sniper", 50f, 0.1f, 4000f, 2f, 10000f, 0xFFFF0033, false, 0f, AmmoType.HEAVY, 5, 4.0f);
 }
 
 enum class GrenadeType(val label: String, val color: Long) {
@@ -361,11 +361,11 @@ data class BattleZone(
     val startRadius: Float,
     val centerX: Float,
     val centerY: Float,
-    val damagePerSec: Float = 5f,
+    val damagePerSec: Float = 8f,
     val isShrinking: Boolean = false,
-    val phaseTimer: Float = 72f,   // Start-Verzögerung (~42s Laufzeit + 30s)
-    val waitDuration: Float = 20f,
-    val shrinkDuration: Float = 25f,
+    val phaseTimer: Float = 50f,   // Start-Verzögerung
+    val waitDuration: Float = 15f,
+    val shrinkDuration: Float = 12f,
     val phase: Int = 0
 ) {
     val effectiveRadius: Float get() = currentRadius

@@ -201,7 +201,7 @@ fun createInitialState(): GameState {
         players = players, groundItems = items, obstacles = obstacles,
         battleZone = BattleZone(
             currentRadius = 12000f, 
-            targetRadius = 12000f, 
+            targetRadius = 7200f, 
             startRadius = 12000f, 
             centerX = center.x, 
             centerY = center.y,
@@ -609,10 +609,12 @@ object GameEngine {
                 )
             } else {
                 // Von Schrumpfen auf Warten wechseln (Nächste Phase vorbereiten)
+                val nextTarget = if (bz.phase + 1 == 0) (bz.targetRadius * 0.6f) else (bz.targetRadius * 0.5f)
                 bz = bz.copy(
                     isShrinking = false, 
                     phaseTimer = bz.waitDuration, 
                     currentRadius = bz.targetRadius,
+                    targetRadius = nextTarget.coerceAtLeast(150f),
                     phase = bz.phase + 1
                 )
             }

@@ -186,7 +186,7 @@ fun MultiplayerGameScreen(
                     // Remote-Spieler Bewegung basierend auf Intent
                     var updatedState = gameState!!
                     updatedState = updatedState.copy(players = updatedState.players.map { p ->
-                        if (p.id == 0 || !p.isAlive || p.isSpawning) return@map p
+                        if (p.id == 0 || !p.isAlive) return@map p
                         if (!p.isMovingIntent) return@map p.copy(velocity = Vec2(0f, 0f))
 
                         val dir = Vec2(kotlin.math.cos(p.rotation), kotlin.math.sin(p.rotation))
@@ -240,7 +240,7 @@ fun MultiplayerGameScreen(
 
                     // Guest: Lokale Simulation (Prediction) für flüssiges Laufen
                     gameState = gs.copy(players = gs.players.map { p ->
-                        if (p.id == myPlayerIndex && p.isAlive && !p.isSpawning) {
+                        if (p.id == myPlayerIndex && p.isAlive) {
                             var pCopy = p.copy(rotation = rotation)
                             if (!isRightDown) {
                                 val dir = Vec2(kotlin.math.cos(rotation), kotlin.math.sin(rotation))
@@ -525,7 +525,7 @@ fun createMultiplayerInitialState(numPlayers: Int, seed: Int): GameState {
         players = players, groundItems = items, obstacles = obstacles,
         battleZone = BattleZone(
             currentRadius = 10000f, 
-            targetRadius = 10000f, 
+            targetRadius = 6000f, 
             startRadius = 10000f, 
             centerX = center.x, 
             centerY = center.y,
@@ -566,6 +566,7 @@ fun createGameSyncData(state: GameState): GameSyncData {
                 armorRarity = p.inventory.armorRarity?.ordinal,
                 isReloading = p.isReloading,
                 reloadTimer = p.reloadTimer,
+                spawnTimer = p.spawnTimer,
             )
         },
         projectiles = state.projectiles.map { proj ->
@@ -669,6 +670,7 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
             velocity = Vec2(sp.velocityX, sp.velocityY),
             isReloading = sp.isReloading,
             reloadTimer = sp.reloadTimer,
+            spawnTimer = sp.spawnTimer,
         )
     }
 
