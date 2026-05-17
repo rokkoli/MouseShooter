@@ -274,6 +274,15 @@ class NetworkManager {
             zObj.color = ez.color.toDouble()
             zObj
         }.toTypedArray()
+        msg.hitscanBeams = data.hitscanBeams.map { beam ->
+            val bObj = js("{}")
+            bObj.path = beam.path.toTypedArray()
+            bObj.timer = beam.timer
+            bObj.maxTimer = beam.maxTimer
+            bObj.color = beam.color.toDouble()
+            bObj.thickness = beam.thickness
+            bObj
+        }.toTypedArray()
         msg.isGameOver = data.isGameOver
         msg.winnerId = data.winnerId
         msg.killFeed = data.killFeed.toTypedArray()

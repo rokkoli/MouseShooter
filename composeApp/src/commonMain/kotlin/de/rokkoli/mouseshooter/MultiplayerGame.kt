@@ -646,12 +646,41 @@ fun createGameSyncData(state: GameState): GameSyncData {
         lootCrates = state.lootCrates.map { c ->
             LootCrateSyncData(c.id, c.pos.x, c.pos.y, c.rarity.ordinal, c.hp)
         },
+        hitscanBeams = state.hitscanBeams.map { beam ->
+            HitscanBeamSyncData(
+                path = beam.path.flatMap { listOf(it.x, it.y) },
+                timer = beam.timer,
+                maxTimer = beam.maxTimer,
+                color = beam.color,
+                thickness = beam.thickness
+            )
+        },
         gameTime = state.gameTime,
         battleZoneRadius = state.battleZone.currentRadius,
         isGameOver = state.isGameOver,
         winnerId = state.winnerId,
         killFeed = state.killFeed,
     )
+}
+
+private fun safeWeaponType(name: String?): WeaponType? {
+    if (name == null || name == "null" || name == "undefined" || name.isBlank()) return null
+    return try { WeaponType.valueOf(name) } catch (e: Exception) { null }
+}
+
+private fun safeGrenadeType(name: String?): GrenadeType? {
+    if (name == null || name == "null" || name == "undefined" || name.isBlank()) return null
+    return try { GrenadeType.valueOf(name) } catch (e: Exception) { null }
+}
+
+private fun safeArmorType(name: String?): ArmorType? {
+    if (name == null || name == "null" || name == "undefined" || name.isBlank()) return null
+    return try { ArmorType.valueOf(name) } catch (e: Exception) { null }
+}
+
+private fun safeAmmoType(name: String?): AmmoType? {
+    if (name == null || name == "null" || name == "undefined" || name.isBlank()) return null
+    return try { AmmoType.valueOf(name) } catch (e: Exception) { null }
 }
 
 /** Wendet GameSyncData auf den lokalen State an. */
@@ -669,12 +698,15 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
             kills = sp.kills,
             inventory = (existing?.inventory ?: Inventory()).copy(
                 selectedSlotIndex = sp.selectedSlotIndex,
-                meleeSlot = sp.meleeSlot?.let { WeaponType.valueOf(it) },
-                gunSlots = sp.gunSlots.map { it?.let { name -> WeaponType.valueOf(name) } },
-                grenadeSlots = sp.grenadeSlots.map { it?.let { name -> GrenadeType.valueOf(name) } },
-                armorSlot = sp.armorSlot?.let { ArmorType.valueOf(it) },
+                meleeSlot = safeWeaponType(sp.meleeSlot),
+                gunSlots = sp.gunSlots.map { safeWeaponType(it) },
+                grenadeSlots = sp.grenadeSlots.map { safeGrenadeType(it) },
+                armorSlot = safeArmorType(sp.armorSlot),
                 clipAmmo = sp.clipAmmo,
-                reserveAmmo = sp.reserveAmmo.mapKeys { AmmoType.valueOf(it.key) },
+                reserveAmmo = sp.reserveAmmo.mapNotNull { (k, v) ->
+                    val ammo = safeAmmoType(k)
+                    if (ammo != null) ammo to v else null
+                }.toMap(),
                 meleeRarity = Rarity.entries.getOrNull(sp.meleeRarity) ?: Rarity.COMMON,
                 gunRarities = sp.gunRarities.map { Rarity.entries.getOrNull(it) ?: Rarity.COMMON },
                 grenadeRarities = sp.grenadeRarities.map { Rarity.entries.getOrNull(it) ?: Rarity.COMMON },
@@ -743,10 +775,10 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
     val updatedGroundItems = syncData.groundItems.map { gi ->
         val rarity = Rarity.entries.getOrNull(gi.rarity) ?: Rarity.COMMON
         when(gi.type) {
-            0 -> GroundItem.WeaponItem(gi.id, Vec2(gi.x, gi.y), WeaponType.valueOf(gi.itemType), rarity)
-            1 -> GroundItem.GrenadeItem(gi.id, Vec2(gi.x, gi.y), GrenadeType.valueOf(gi.itemType), rarity)
-            2 -> GroundItem.ArmorItem(gi.id, Vec2(gi.x, gi.y), ArmorType.valueOf(gi.itemType), rarity)
-            else -> GroundItem.AmmoItem(gi.id, Vec2(gi.x, gi.y), AmmoType.valueOf(gi.itemType), 30, rarity) // Default amount 30
+            0 -> GroundItem.WeaponItem(gi.id, Vec2(gi.x, gi.y), safeWeaponType(gi.itemType) ?: WeaponType.FISTS, rarity)
+            1 -> GroundItem.GrenadeItem(gi.id, Vec2(gi.x, gi.y), safeGrenadeType(gi.itemType) ?: GrenadeType.NORMAL, rarity)
+            2 -> GroundItem.ArmorItem(gi.id, Vec2(gi.x, gi.y), safeArmorType(gi.itemType) ?: ArmorType.LIGHT, rarity)
+            else -> GroundItem.AmmoItem(gi.id, Vec2(gi.x, gi.y), safeAmmoType(gi.itemType) ?: AmmoType.LIGHT, 30, rarity)
         }
     }
 
@@ -771,6 +803,22 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
         )
     }
 
+    val updatedHitscanBeams = syncData.hitscanBeams.map { hb ->
+        val path = mutableListOf<Vec2>()
+        for (i in 0 until hb.path.size step 2) {
+            val x = hb.path.getOrNull(i) ?: 0f
+            val y = hb.path.getOrNull(i + 1) ?: 0f
+            path.add(Vec2(x, y))
+        }
+        HitscanBeam(
+            path = path,
+            timer = hb.timer,
+            maxTimer = hb.maxTimer,
+            color = hb.color,
+            thickness = hb.thickness
+        )
+    }
+
     return base.copy(
         players = updatedPlayers,
         projectiles = updatedProjectiles,
@@ -780,6 +828,7 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
         groundItems = updatedGroundItems,
         effectZones = updatedEffectZones,
         lootCrates = updatedLootCrates,
+        hitscanBeams = updatedHitscanBeams,
         gameTime = syncData.gameTime,
         battleZone = base.battleZone.copy(currentRadius = syncData.battleZoneRadius),
         isGameOver = syncData.isGameOver,

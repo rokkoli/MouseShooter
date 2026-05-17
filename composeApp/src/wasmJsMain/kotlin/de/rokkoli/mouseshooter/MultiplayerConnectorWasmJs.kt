@@ -73,15 +73,13 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                         val gunSlotsArr = getJsArray(pObj, "gunSlots")
                         val gunSlots = mutableListOf<String?>()
                         for (j in 0 until getJsArrayLength(gunSlotsArr)) {
-                            val s = getJsArrayItem(gunSlotsArr, j)
-                            gunSlots.add(if (s == null) null else s.toString())
+                            gunSlots.add(getJsStringAt(gunSlotsArr, j))
                         }
 
                         val grenadeSlotsArr = getJsArray(pObj, "grenadeSlots")
                         val grenadeSlots = mutableListOf<String?>()
                         for (j in 0 until getJsArrayLength(grenadeSlotsArr)) {
-                            val s = getJsArrayItem(grenadeSlotsArr, j)
-                            grenadeSlots.add(if (s == null) null else s.toString())
+                            grenadeSlots.add(getJsStringAt(grenadeSlotsArr, j))
                         }
 
                         val clipAmmoArr = getJsArray(pObj, "clipAmmo")
@@ -252,6 +250,26 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                         killFeed.add(text)
                     }
 
+                    val hbArr = getJsArray(dataAny, "hitscanBeams")
+                    val hbLen = getJsArrayLength(hbArr)
+                    val hitscanBeams = mutableListOf<HitscanBeamSyncData>()
+                    for (i in 0 until hbLen) {
+                        val bObj = getJsArrayItem(hbArr, i)
+                        val pathArr = getJsArray(bObj, "path")
+                        val pathLen = getJsArrayLength(pathArr)
+                        val path = mutableListOf<Float>()
+                        for (j in 0 until pathLen) {
+                            path.add(getJsFloatAt(pathArr, j))
+                        }
+                        hitscanBeams.add(HitscanBeamSyncData(
+                            path = path,
+                            timer = getJsFloat(bObj, "timer"),
+                            maxTimer = getJsFloat(bObj, "maxTimer"),
+                            color = getJsLong(bObj, "color").toLong(),
+                            thickness = getJsFloat(bObj, "thickness"),
+                        ))
+                    }
+
                     gameSyncCallback?.invoke(GameSyncData(
                         players = players,
                         projectiles = projectiles,
@@ -261,6 +279,7 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                         groundItems = groundItems,
                         effectZones = effectZones,
                         lootCrates = lootCrates,
+                        hitscanBeams = hitscanBeams,
                         gameTime = getJsFloat(dataAny, "gameTime"),
                         battleZoneRadius = getJsFloat(dataAny, "battleZoneRadius"),
                         isGameOver = getJsBoolean(dataAny, "isGameOver"),
@@ -312,7 +331,7 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
     override fun sendGameStart(numPlayers: Int, seed: Int) { network.sendGameStart(numPlayers, seed) }
     override fun sendPlayerInput(playerIndex: Int, data: PlayerInputData) { network.sendPlayerInput(playerIndex, data) }
     override fun sendGameSync(data: GameSyncData) {
-        network.sendGameSync(data.players, data.projectiles, data.meleeSwings, data.explosions, data.grenades, data.groundItems, data.effectZones, data.lootCrates, data.gameTime, data.battleZoneRadius, data.isGameOver, data.winnerId, data.killFeed)
+        network.sendGameSync(data.players, data.projectiles, data.meleeSwings, data.explosions, data.grenades, data.groundItems, data.effectZones, data.lootCrates, data.hitscanBeams, data.gameTime, data.battleZoneRadius, data.isGameOver, data.winnerId, data.killFeed)
     }
     override fun sendGameOver(winnerId: Int) { network.sendGameOver(winnerId) }
     override fun sendShoot(playerIndex: Int) { network.sendShoot(playerIndex) }

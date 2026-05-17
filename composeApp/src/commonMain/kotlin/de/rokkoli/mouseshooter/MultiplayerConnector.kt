@@ -176,6 +176,14 @@ data class LootCrateSyncData(
     val hp: Float,
 )
 
+data class HitscanBeamSyncData(
+    val path: List<Float>, // Alternating x,y coordinates: [x1, y1, x2, y2, ...]
+    val timer: Float,
+    val maxTimer: Float,
+    val color: Long,
+    val thickness: Float
+)
+
 /** Flattened game state for network sync (host → guests). */
 data class GameSyncData(
     val players: List<PlayerSyncData>,
@@ -186,6 +194,7 @@ data class GameSyncData(
     val groundItems: List<GroundItemSyncData> = emptyList(),
     val effectZones: List<EffectZoneSyncData> = emptyList(),
     val lootCrates: List<LootCrateSyncData> = emptyList(),
+    val hitscanBeams: List<HitscanBeamSyncData> = emptyList(),
     val gameTime: Float = 0f,
     val battleZoneRadius: Float = 4000f,
     val isGameOver: Boolean = false,

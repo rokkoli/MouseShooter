@@ -537,9 +537,11 @@ object GameEngine {
             // Bewegung erlaubt AUCH während Spawn (nur Schießen gesperrt)
             if (!isRightMouseDown && dist > 5f) {
                 val dir = toMouse.normalized()
+                val isAttackingWithChainsaw = state.meleeSwings.any { it.ownerId == p.id && it.weapon == WeaponType.CHAINSAW }
                 val speedMod = when {
                     p.isSpawning      -> 0.5f          // langsamer beim Landen
                     newSe.slowTimer > 0f -> newSe.slowFactor
+                    isAttackingWithChainsaw -> 1.35f   // 35% schneller beim Angreifen mit der Kettensäge
                     else              -> 1f
                 }
                 val dashVel = if (newSe.dashTimer > 0f) newSe.dashVelocity else Vec2(0f, 0f)
@@ -1035,7 +1037,7 @@ object GameEngine {
                     } else {
                         val slotIdx = bot.inventory.selectedSlotIndex - 1
                         val rarity = bot.inventory.gunRarities.getOrNull(slotIdx) ?: Rarity.COMMON
-                        bot = bot.copy(isReloading = true, reloadTimer = activeWeapon.reloadTime * rarity.reloadMod)
+                        bot = bot.copy(isReloading = true, reloadTimer = weaponStats(activeWeapon, rarity).reloadTime)
                     }
                 }
             }
@@ -1132,7 +1134,7 @@ object GameEngine {
                 val reserve = inv.reserveAmmo[weapon.ammoType] ?: 0
                 if (reserve > 0) {
                     return state.copy(players = state.players.map {
-                        if (it.id == playerId) it.copy(isReloading = true, reloadTimer = weapon.reloadTime * rarity.reloadMod) else it
+                        if (it.id == playerId) it.copy(isReloading = true, reloadTimer = weaponStats(weapon, rarity).reloadTime) else it
                     })
                 }
                 return state
@@ -1140,8 +1142,9 @@ object GameEngine {
         }
 
         var newState = state; var nextId = state.nextId
-        val damage = weapon.damage * rarity.damageMod
-        val fireRate = weapon.fireRate * rarity.fireRateMod
+        val stats = weaponStats(weapon, rarity)
+        val damage = stats.damage
+        val fireRate = stats.fireRate
 
         if (weapon.isMelee) {
             var newInv = inv
@@ -1161,7 +1164,11 @@ object GameEngine {
 
             val dir = Vec2(cos(player.rotation), sin(player.rotation))
             val isLeft = !player.lastMeleeLeft
-            val swingDuration = if (weapon == WeaponType.KATANA) 0.35f else 0.15f
+            val swingDuration = when (weapon) {
+                WeaponType.KATANA -> 0.35f
+                WeaponType.CHAINSAW -> 1f / fireRate
+                else -> 0.15f
+            }
             newState = newState.copy(
                 meleeSwings = newState.meleeSwings + MeleeSwing(playerId, weapon, isLeft, player.pos, dir, weapon.range, damage, weapon.knockback, timer = swingDuration, maxTimer = swingDuration),
                 players = newState.players.map { if (it.id == playerId) it.copy(lastMeleeLeft = isLeft) else it }

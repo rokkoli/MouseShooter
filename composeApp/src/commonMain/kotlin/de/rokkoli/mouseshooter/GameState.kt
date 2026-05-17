@@ -249,9 +249,7 @@ data class Inventory(
         
         newGuns[targetIdx] = w
         newRarities[targetIdx] = r
-        val clipSize = if (w == WeaponType.SHOTGUN) {
-            if (r.ordinal >= Rarity.EPIC.ordinal) 2 else 1
-        } else w.clipSize
+        val clipSize = weaponStats(w, r).clipSize
         newClip[targetIdx] = clipSize
         
         return copy(gunSlots = newGuns, gunRarities = newRarities, clipAmmo = newClip)
@@ -448,3 +446,70 @@ data class GameState(
     val killFeed: List<String> = emptyList(),
     val spectatedPlayerId: Int? = null
 )
+
+data class WeaponStats(
+    val damage: Float,
+    val fireRate: Float,
+    val reloadTime: Float,
+    val clipSize: Int
+)
+
+fun weaponStats(weapon: WeaponType, rarity: Rarity): WeaponStats {
+    val damageMod = when (rarity) {
+        Rarity.COMMON -> 1.0f
+        Rarity.UNCOMMON -> 1.15f
+        Rarity.RARE -> 1.30f
+        Rarity.EPIC -> 1.50f
+        Rarity.MYTHIC -> 1.75f
+        Rarity.LEGENDARY -> 2.00f
+    }
+    
+    val fireRateMod = when (rarity) {
+        Rarity.COMMON -> 1.0f
+        Rarity.UNCOMMON -> 1.05f
+        Rarity.RARE -> 1.15f
+        Rarity.EPIC -> 1.30f
+        Rarity.MYTHIC -> 1.45f
+        Rarity.LEGENDARY -> 1.60f
+    }
+    
+    val reloadMod = when (rarity) {
+        Rarity.COMMON -> 1.0f
+        Rarity.UNCOMMON -> 0.95f
+        Rarity.RARE -> 0.85f
+        Rarity.EPIC -> 0.70f
+        Rarity.MYTHIC -> 0.60f
+        Rarity.LEGENDARY -> 0.50f
+    }
+
+    val baseDamage = weapon.damage
+    val baseFireRate = weapon.fireRate
+    val baseReloadTime = weapon.reloadTime
+    var clipSize = weapon.clipSize
+
+    if (weapon == WeaponType.SHOTGUN) {
+        if (rarity.ordinal >= Rarity.EPIC.ordinal) {
+            clipSize = 2
+        }
+    }
+    
+    val finalDamage = if (weapon == WeaponType.DUAL_ENERGY_PISTOL) {
+        when (rarity) {
+            Rarity.COMMON -> 1.2f
+            Rarity.UNCOMMON -> 1.3f
+            Rarity.RARE -> 1.5f
+            Rarity.EPIC -> 1.7f
+            Rarity.MYTHIC -> 2.0f
+            Rarity.LEGENDARY -> 2.3f
+        }
+    } else {
+        baseDamage * damageMod
+    }
+
+    return WeaponStats(
+        damage = finalDamage,
+        fireRate = baseFireRate * fireRateMod,
+        reloadTime = if (weapon.isMelee) 0f else baseReloadTime * reloadMod,
+        clipSize = clipSize
+    )
+}

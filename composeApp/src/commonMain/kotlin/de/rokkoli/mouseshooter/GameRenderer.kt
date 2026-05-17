@@ -260,8 +260,8 @@ object GameRenderer {
                     val dir = Offset(cos(baseAngle), sin(baseAngle))
                     val startPos = start + dir * (10f * zoom)
                     val end = startPos + dir * (swing.range * zoom) + Offset(vibration, vibration)
-                    drawLine(color = Color.DarkGray.withAlpha(alpha), start = startPos, end = end, strokeWidth = 10f * zoom)
-                    drawLine(color = Color.Gray.withAlpha(alpha), start = startPos, end = end, strokeWidth = 8f * zoom, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f))
+                    drawLine(color = Color.DarkGray, start = startPos, end = end, strokeWidth = 10f * zoom)
+                    drawLine(color = Color.Gray, start = startPos, end = end, strokeWidth = 8f * zoom, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f))
                 }
                 else -> {
                     val end = start + Offset(swing.direction.x, swing.direction.y) * (swing.range * zoom)

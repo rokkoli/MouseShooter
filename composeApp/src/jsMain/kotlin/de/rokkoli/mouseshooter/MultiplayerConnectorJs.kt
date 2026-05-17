@@ -174,6 +174,18 @@ class JsMultiplayerConnector : MultiplayerConnector() {
                         )
                     } ?: emptyList()
 
+                    val hitscanBeams = (data.hitscanBeams as? Array<dynamic>)?.map { hb ->
+                        val pathArr = hb.path as Array<dynamic>
+                        val path = pathArr.map { (it as Number).toFloat() }
+                        HitscanBeamSyncData(
+                            path = path,
+                            timer = (hb.timer as Number).toFloat(),
+                            maxTimer = (hb.maxTimer as Number).toFloat(),
+                            color = (hb.color as Number).toLong(),
+                            thickness = (hb.thickness as Number).toFloat()
+                        )
+                    } ?: emptyList()
+
                     val killFeed = (data.killFeed as? Array<dynamic>)?.map { it.toString() } ?: emptyList()
                     gameSyncCallback?.invoke(GameSyncData(
                         players = players,
@@ -184,6 +196,7 @@ class JsMultiplayerConnector : MultiplayerConnector() {
                         groundItems = groundItems,
                         effectZones = effectZones,
                         lootCrates = lootCrates,
+                        hitscanBeams = hitscanBeams,
                         gameTime = (data.gameTime as Number).toFloat(),
                         battleZoneRadius = (data.battleZoneRadius as Number).toFloat(),
                         isGameOver = data.isGameOver as Boolean,

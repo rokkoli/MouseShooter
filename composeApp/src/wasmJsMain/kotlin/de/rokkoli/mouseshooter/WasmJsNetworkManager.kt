@@ -69,8 +69,14 @@ internal external fun performanceNow(): Float
 @JsFun("function(arr, index) { return arr[index]; }")
 internal external fun getJsIntAt(arr: JsAny, index: Int): Int
 
+@JsFun("function(arr, index) { return arr[index]; }")
+internal external fun getJsFloatAt(arr: JsAny, index: Int): Float
+
 @JsFun("function(obj) { return Object.keys(obj); }")
 internal external fun getJsKeys(obj: JsAny): JsAny
+
+@JsFun("function(arr, index) { return arr[index] != null ? String(arr[index]) : null; }")
+internal external fun getJsStringAt(arr: JsAny, index: Int): String?
 
 @JsFun("function(obj, key) { return obj[key]; }")
 internal external fun getJsAny(obj: JsAny, key: String): JsAny?
@@ -247,7 +253,7 @@ class WasmJsNetworkManager {
                      meleeSwings: List<MeleeSwingSyncData>, explosions: List<ExplosionSyncData>,
                      grenades: List<GrenadeSyncData>,
                      groundItems: List<GroundItemSyncData>, effectZones: List<EffectZoneSyncData>,
-                     lootCrates: List<LootCrateSyncData>,
+                     lootCrates: List<LootCrateSyncData>, hitscanBeams: List<HitscanBeamSyncData>,
                      gameTime: Float, battleZoneRadius: Float, isGameOver: Boolean, winnerId: Int,
                      killFeed: List<String>) {
         val msg = createJsObject()
@@ -404,6 +410,20 @@ class WasmJsNetworkManager {
             pushJsArray(cratesArr, cObj)
         }
         setJsAny(msg, "lootCrates", cratesArr)
+
+        val hbArr = createJsArray()
+        hitscanBeams.forEach { beam ->
+            val bObj = createJsObject()
+            val pathArr = createJsArray()
+            beam.path.forEach { p -> pushJsArray(pathArr, p.toJsNumber()) }
+            setJsAny(bObj, "path", pathArr)
+            setJsFloat(bObj, "timer", beam.timer)
+            setJsFloat(bObj, "maxTimer", beam.maxTimer)
+            setJsDouble(bObj, "color", beam.color.toDouble())
+            setJsFloat(bObj, "thickness", beam.thickness)
+            pushJsArray(hbArr, bObj)
+        }
+        setJsAny(msg, "hitscanBeams", hbArr)
 
         setJsFloat(msg, "gameTime", gameTime)
         setJsFloat(msg, "battleZoneRadius", battleZoneRadius)
