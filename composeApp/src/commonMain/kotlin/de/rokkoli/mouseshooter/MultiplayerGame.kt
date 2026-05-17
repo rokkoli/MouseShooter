@@ -777,7 +777,7 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
         when(gi.type) {
             0 -> GroundItem.WeaponItem(gi.id, Vec2(gi.x, gi.y), safeWeaponType(gi.itemType) ?: WeaponType.FISTS, rarity)
             1 -> GroundItem.GrenadeItem(gi.id, Vec2(gi.x, gi.y), safeGrenadeType(gi.itemType) ?: GrenadeType.NORMAL, rarity)
-            2 -> GroundItem.ArmorItem(gi.id, Vec2(gi.x, gi.y), safeArmorType(gi.itemType) ?: ArmorType.LIGHT, rarity)
+            2 -> GroundItem.ArmorItem(gi.id, Vec2(gi.x, gi.y), safeArmorType(gi.itemType) ?: ArmorType.MILITARY, rarity)
             else -> GroundItem.AmmoItem(gi.id, Vec2(gi.x, gi.y), safeAmmoType(gi.itemType) ?: AmmoType.LIGHT, 30, rarity)
         }
     }

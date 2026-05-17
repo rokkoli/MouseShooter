@@ -415,7 +415,7 @@ class WasmJsNetworkManager {
         hitscanBeams.forEach { beam ->
             val bObj = createJsObject()
             val pathArr = createJsArray()
-            beam.path.forEach { p -> pushJsArray(pathArr, p.toJsNumber()) }
+            beam.path.forEach { p -> pushJsArray(pathArr, p.toDouble().toJsNumber()) }
             setJsAny(bObj, "path", pathArr)
             setJsFloat(bObj, "timer", beam.timer)
             setJsFloat(bObj, "maxTimer", beam.maxTimer)
