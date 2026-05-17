@@ -157,17 +157,15 @@ fun MultiplayerGameScreen(
                     val zoom = gs.zoomLevel
                     val screenCenter = Vec2(screenSize.x / 2, screenSize.y / 2)
 
-                    // Lokaler Host-Spieler Input (Markiere P0 als Lokal für Engine!)
-                    val localPlayer = gs.players.firstOrNull { it.id == 0 && it.isAlive }
-                    if (localPlayer != null && !localPlayer.isSpawning) {
-                        val toMouse = (mousePos - screenCenter) * (1f / zoom)
-                        val rotation = atan2(toMouse.y, toMouse.x)
-                        gameState = gs.copy(players = gs.players.map {
-                            if (it.id == 0 && it.isAlive) {
-                                it.copy(rotation = rotation, isLocalPlayer = true, isMovingIntent = !isRightDown)
+                    // 1) Lokaler Host-Spieler Input (Rotation + Intent)
+                    gameState = gameState!!.let { current ->
+                        current.copy(players = current.players.map { p ->
+                            if (p.id == 0 && p.isAlive) {
+                                val toMouse = (mousePos - screenCenter) * (1f / zoom)
+                                val rotation = atan2(toMouse.y, toMouse.x)
+                                p.copy(rotation = rotation, isLocalPlayer = true, isMovingIntent = !isRightDown)
                             } else {
-                                // WICHTIG: Host muss alle anderen Spieler als Remote lassen
-                                it.copy(isLocalPlayer = false)
+                                p.copy(isLocalPlayer = false)
                             }
                         })
                     }
@@ -176,29 +174,30 @@ fun MultiplayerGameScreen(
                     if (isLeftDown) {
                         val p = gameState!!.players.firstOrNull { it.id == 0 && it.isAlive }
                         val w = p?.inventory?.activeWeapon
-                        val isAuto = w == WeaponType.SMG || w == WeaponType.FLAMETHROWER || w == WeaponType.MINIGUN
+                        val isAuto = w == WeaponType.SMG || w == WeaponType.FLAMETHROWER || w == WeaponType.MINIGUN || w == WeaponType.DUAL_ENERGY_PISTOL || w == WeaponType.CHAINSAW
                         if (isAuto || !wasLeftDown) {
                             if (p != null) gameState = GameEngine.shoot(gameState!!, 0)
                         }
                     }
                     wasLeftDown = isLeftDown
 
-                    // Remote-Spieler Bewegung basierend auf Intent
-                    var updatedState = gameState!!
-                    updatedState = updatedState.copy(players = updatedState.players.map { p ->
-                        if (p.id == 0 || !p.isAlive) return@map p
-                        if (!p.isMovingIntent) return@map p.copy(velocity = Vec2(0f, 0f))
+                    // 3) Remote-Spieler Bewegung basierend auf Intent
+                    gameState = gameState!!.let { current ->
+                        current.copy(players = current.players.map { p ->
+                            if (p.id == 0 || !p.isAlive) return@map p
+                            if (!p.isMovingIntent) return@map p.copy(velocity = Vec2(0f, 0f))
 
-                        val dir = Vec2(kotlin.math.cos(p.rotation), kotlin.math.sin(p.rotation))
-                        val vel = dir * PLAYER_SPEED
-                        var newPos = p.pos + vel * dt
-                        newPos = GameEngine.resolveObstacleCollision(newPos, updatedState.obstacles, PLAYER_RADIUS)
-                        newPos = newPos.clampToMap(updatedState.mapWidth, updatedState.mapHeight)
-                        p.copy(pos = newPos, velocity = vel)
-                    })
+                            val dir = Vec2(kotlin.math.cos(p.rotation), kotlin.math.sin(p.rotation))
+                            val vel = dir * PLAYER_SPEED
+                            var newPos = p.pos + vel * dt
+                            newPos = GameEngine.resolveObstacleCollision(newPos, current.obstacles, PLAYER_RADIUS)
+                            newPos = newPos.clampToMap(current.mapWidth, current.mapHeight)
+                            p.copy(pos = newPos, velocity = vel)
+                        })
+                    }
 
-                    // Update (für Host-Spieler Bewegung + Physics)
-                    gameState = GameEngine.update(updatedState, dt, mousePos, isRightDown, screenSize)
+                    // 4) Update (Physik + Spawn-Phase etc.)
+                    gameState = GameEngine.update(gameState!!, dt, mousePos, isRightDown, screenSize)
 
                     // State Sync
                     syncCounter++
@@ -231,7 +230,7 @@ fun MultiplayerGameScreen(
                     if (isLeftDown) {
                         val p = gs.players.firstOrNull { it.id == myPlayerIndex && it.isAlive }
                         val w = p?.inventory?.activeWeapon
-                        val isAuto = w == WeaponType.SMG || w == WeaponType.FLAMETHROWER || w == WeaponType.MINIGUN
+                        val isAuto = w == WeaponType.SMG || w == WeaponType.FLAMETHROWER || w == WeaponType.MINIGUN || w == WeaponType.DUAL_ENERGY_PISTOL || w == WeaponType.CHAINSAW
                         if (isAuto || !wasLeftDown) {
                             connector.sendShoot(myPlayerIndex)
                         }
@@ -240,11 +239,23 @@ fun MultiplayerGameScreen(
 
                     // Guest: Lokale Simulation (Prediction) für flüssiges Laufen
                     gameState = gs.copy(players = gs.players.map { p ->
-                        if (p.id == myPlayerIndex && p.isAlive) {
-                            var pCopy = p.copy(rotation = rotation)
+                        // Lokal den Spawn-Timer herunterrechnen (Host macht das über GameEngine.update)
+                        var updated = p
+                        if (updated.isSpawning) {
+                            val newTimer = updated.spawnTimer - dt
+                            updated = if (newTimer <= 0f) {
+                                updated.copy(isSpawning = false, spawnTimer = 0f)
+                            } else {
+                                updated.copy(spawnTimer = newTimer)
+                            }
+                        }
+
+                        if (updated.id == myPlayerIndex && updated.isAlive) {
+                            var pCopy = updated.copy(rotation = rotation)
                             if (!isRightDown) {
+                                val speedMod = if (pCopy.isSpawning) 0.5f else 1f
                                 val dir = Vec2(kotlin.math.cos(rotation), kotlin.math.sin(rotation))
-                                val vel = dir * PLAYER_SPEED
+                                val vel = dir * PLAYER_SPEED * speedMod
                                 var newPos = pCopy.pos + vel * dt
                                 newPos = GameEngine.resolveObstacleCollision(newPos, gs.obstacles, PLAYER_RADIUS)
                                 newPos = newPos.clampToMap(gs.mapWidth, gs.mapHeight)
@@ -253,7 +264,7 @@ fun MultiplayerGameScreen(
                                 pCopy = pCopy.copy(velocity = Vec2(0f, 0f))
                             }
                             pCopy
-                        } else p
+                        } else updated
                     })
 
                     // Kamera auf Predicted Position
@@ -499,7 +510,7 @@ fun createMultiplayerInitialState(numPlayers: Int, seed: Int): GameState {
     val mapW = 12000f
     val mapH = 12000f
     val center = Vec2(mapW / 2, mapH / 2)
-    val (obstacles, items) = MapGenerator.generate(mapW, mapH, kotlin.random.Random(seed))
+    val (obstacles, items, crates) = MapGenerator.generate(mapW, mapH, kotlin.random.Random(seed))
 
     val players = mutableListOf<Player>()
 
@@ -522,7 +533,7 @@ fun createMultiplayerInitialState(numPlayers: Int, seed: Int): GameState {
     }
 
     return GameState(
-        players = players, groundItems = items, obstacles = obstacles,
+        players = players, groundItems = items, obstacles = obstacles, lootCrates = crates,
         battleZone = BattleZone(
             currentRadius = 10000f, 
             targetRadius = 6000f, 
@@ -631,6 +642,9 @@ fun createGameSyncData(state: GameState): GameSyncData {
         },
         effectZones = state.effectZones.map { ez ->
             EffectZoneSyncData(ez.id, ez.pos.x, ez.pos.y, ez.radius, ez.type.ordinal, ez.color)
+        },
+        lootCrates = state.lootCrates.map { c ->
+            LootCrateSyncData(c.id, c.pos.x, c.pos.y, c.rarity.ordinal, c.hp)
         },
         gameTime = state.gameTime,
         battleZoneRadius = state.battleZone.currentRadius,
@@ -748,6 +762,15 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
         )
     }
 
+    val updatedLootCrates = syncData.lootCrates.map { c ->
+        LootCrate(
+            id = c.id,
+            pos = Vec2(c.x, c.y),
+            rarity = Rarity.entries.getOrNull(c.rarity) ?: Rarity.COMMON,
+            hp = c.hp,
+        )
+    }
+
     return base.copy(
         players = updatedPlayers,
         projectiles = updatedProjectiles,
@@ -756,6 +779,7 @@ fun applyGameSync(currentState: GameState?, syncData: GameSyncData, seed: Int): 
         grenades = updatedGrenades,
         groundItems = updatedGroundItems,
         effectZones = updatedEffectZones,
+        lootCrates = updatedLootCrates,
         gameTime = syncData.gameTime,
         battleZone = base.battleZone.copy(currentRadius = syncData.battleZoneRadius),
         isGameOver = syncData.isGameOver,

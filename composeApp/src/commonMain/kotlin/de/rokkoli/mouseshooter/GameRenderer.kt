@@ -82,6 +82,48 @@ object GameRenderer {
             }
         }
 
+        // ── Loot-Kisten ───────────────────────────────────────────────────────
+        for (crate in state.lootCrates) {
+            val c = crate.pos.toOffset(camX, camY, screenW, screenH, zoom)
+            val w = crate.width * zoom
+            val h = crate.height * zoom
+            if (c.x + w / 2 < -20 || c.x - w / 2 > screenW + 20 || c.y + h / 2 < -20 || c.y - h / 2 > screenH + 20) continue
+
+            val rarityColor = Color(crate.rarity.glowColor)
+            val glowPhase = state.gameTime * 2.5f + crate.id * 0.7f
+            val glowAlpha = (sin(glowPhase) * 0.3f + 0.4f).coerceIn(0f, 1f)
+
+            // Glow
+            drawRect(color = rarityColor.copy(alpha = glowAlpha * 0.4f),
+                topLeft = Offset(c.x - w / 2 - 4f, c.y - h / 2 - 4f),
+                size = Size(w + 8f, h + 8f))
+
+            // Schatten
+            drawRect(color = Color.Black.copy(alpha = 0.3f),
+                topLeft = Offset(c.x - w / 2 + 3f, c.y - h / 2 + 3f),
+                size = Size(w, h))
+
+            // Kiste (Hauptfarbe etwas dunkler als Glow)
+            val crateColor = rarityColor.copy(alpha = 0.85f)
+            drawRect(color = crateColor,
+                topLeft = Offset(c.x - w / 2, c.y - h / 2),
+                size = Size(w, h))
+
+            // Rand
+            drawRect(color = Color.White.copy(alpha = 0.5f),
+                topLeft = Offset(c.x - w / 2, c.y - h / 2),
+                size = Size(w, h),
+                style = Stroke(1.5f))
+
+            // Mittel-Strich (wie ein Deckel)
+            drawLine(
+                color = Color.White.copy(alpha = 0.3f),
+                start = Offset(c.x - w / 2 + 2f, c.y),
+                end = Offset(c.x + w / 2 - 2f, c.y),
+                strokeWidth = 1f
+            )
+        }
+
         // ── Ground Items (mit Glow) ───────────────────────────────────────────
         for (item in state.groundItems) {
             val c = item.pos.toOffset(camX, camY, screenW, screenH, zoom)
@@ -140,11 +182,29 @@ object GameRenderer {
                 end = Offset(c.x + trailDir.x, c.y + trailDir.y), strokeWidth = r * 1.5f)
         }
 
+        // ── Hitscan Beams ─────────────────────────────────────────────────────
+        for (beam in state.hitscanBeams) {
+            val alpha = (beam.timer / beam.maxTimer).coerceIn(0f, 1f)
+            if (alpha <= 0f) continue
+            val cColor = Color(beam.color).withAlpha(alpha)
+            val thickness = beam.thickness * zoom
+            for (i in 0 until beam.path.size - 1) {
+                val p1 = beam.path[i].toOffset(camX, camY, screenW, screenH, zoom)
+                val p2 = beam.path[i + 1].toOffset(camX, camY, screenW, screenH, zoom)
+                drawLine(color = cColor, start = p1, end = p2, strokeWidth = thickness)
+                drawCircle(color = cColor, radius = thickness / 2f, center = p1)
+            }
+            if (beam.path.isNotEmpty()) {
+                val last = beam.path.last().toOffset(camX, camY, screenW, screenH, zoom)
+                drawCircle(color = Color.White.withAlpha(alpha), radius = thickness, center = last)
+            }
+        }
+
         // ── Melee-Visualisierung ──────────────────────────────────────────────
         for (swing in state.meleeSwings) {
             val start = swing.pos.toOffset(camX, camY, screenW, screenH, zoom)
             val baseAngle = atan2(swing.direction.y, swing.direction.x)
-            val alpha = (swing.timer / 0.15f).coerceIn(0f, 1f)
+            val alpha = (swing.timer / swing.maxTimer).coerceIn(0f, 1f)
             val progress = 1f - alpha
             val isLeftOffset = if (swing.isLeft) -1f else 1f
 
@@ -175,6 +235,33 @@ object GameRenderer {
                     val col = if (swing.weapon == WeaponType.BOXING_GLOVES) Color(0xFFFF3300) else Color(0xFFFFAAAA)
                     drawCircle(color = col.withAlpha(alpha), radius = 14f * zoom, center = gloveCenter)
                     drawCircle(color = Color.Black.withAlpha(alpha), radius = 14f * zoom, center = gloveCenter, style = Stroke(2f))
+                }
+                WeaponType.LASER_SWORD -> {
+                    // Weites Schwingen (Sweep) wie Langmesser, aber mit leuchtendem Laser
+                    val swingAngle = baseAngle + isLeftOffset * (PI.toFloat() / 2f) * (1f - progress * 1.5f)
+                    val dir = Offset(cos(swingAngle), sin(swingAngle))
+                    val end = start + dir * (swing.range * zoom)
+                    drawLine(color = Color(0xFF00FF00).withAlpha(alpha * 0.5f), start = start, end = end, strokeWidth = 8f * zoom)
+                    drawLine(color = Color.White.withAlpha(alpha), start = start, end = end, strokeWidth = 4f * zoom)
+                }
+                WeaponType.KATANA -> {
+                    // Klinge flach vor dem Körper halten (senkrecht zur Blickrichtung)
+                    val perp = Offset(cos(baseAngle + PI.toFloat() / 2f), sin(baseAngle + PI.toFloat() / 2f)) // zeigt nach rechts vom Spieler aus
+                    // Sweep wandert von links nach rechts
+                    val sweepPos = perp * ((progress - 0.5f) * 80f * zoom * -isLeftOffset)
+                    val handle = start + Offset(cos(baseAngle), sin(baseAngle)) * (20f * zoom) + sweepPos
+                    // Die Klinge zeigt vom Griff weg (links oder rechts, je nach isLeftOffset)
+                    val end = handle + perp * (swing.range * zoom * isLeftOffset)
+                    drawLine(color = Color.LightGray.withAlpha(alpha), start = handle, end = end, strokeWidth = 4f * zoom)
+                }
+                WeaponType.CHAINSAW -> {
+                    // Wird vor dem Körper gehalten, vibriert leicht
+                    val vibration = kotlin.random.Random.nextFloat() * 4f - 2f
+                    val dir = Offset(cos(baseAngle), sin(baseAngle))
+                    val startPos = start + dir * (10f * zoom)
+                    val end = startPos + dir * (swing.range * zoom) + Offset(vibration, vibration)
+                    drawLine(color = Color.DarkGray.withAlpha(alpha), start = startPos, end = end, strokeWidth = 10f * zoom)
+                    drawLine(color = Color.Gray.withAlpha(alpha), start = startPos, end = end, strokeWidth = 8f * zoom, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f))
                 }
                 else -> {
                     val end = start + Offset(swing.direction.x, swing.direction.y) * (swing.range * zoom)

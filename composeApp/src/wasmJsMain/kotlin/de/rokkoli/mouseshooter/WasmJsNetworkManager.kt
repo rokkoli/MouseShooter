@@ -247,6 +247,7 @@ class WasmJsNetworkManager {
                      meleeSwings: List<MeleeSwingSyncData>, explosions: List<ExplosionSyncData>,
                      grenades: List<GrenadeSyncData>,
                      groundItems: List<GroundItemSyncData>, effectZones: List<EffectZoneSyncData>,
+                     lootCrates: List<LootCrateSyncData>,
                      gameTime: Float, battleZoneRadius: Float, isGameOver: Boolean, winnerId: Int,
                      killFeed: List<String>) {
         val msg = createJsObject()
@@ -302,6 +303,7 @@ class WasmJsNetworkManager {
             
             setJsBoolean(pObj, "isReloading", p.isReloading)
             setJsFloat(pObj, "reloadTimer", p.reloadTimer)
+            setJsFloat(pObj, "spawnTimer", p.spawnTimer)
             
             pushJsArray(playersArr, pObj)
         }
@@ -390,6 +392,18 @@ class WasmJsNetworkManager {
             pushJsArray(ezArr, zObj)
         }
         setJsAny(msg, "effectZones", ezArr)
+
+        val cratesArr = createJsArray()
+        lootCrates.forEach { c ->
+            val cObj = createJsObject()
+            setJsInt(cObj, "id", c.id)
+            setJsFloat(cObj, "x", c.x)
+            setJsFloat(cObj, "y", c.y)
+            setJsInt(cObj, "rarity", c.rarity)
+            setJsFloat(cObj, "hp", c.hp)
+            pushJsArray(cratesArr, cObj)
+        }
+        setJsAny(msg, "lootCrates", cratesArr)
 
         setJsFloat(msg, "gameTime", gameTime)
         setJsFloat(msg, "battleZoneRadius", battleZoneRadius)

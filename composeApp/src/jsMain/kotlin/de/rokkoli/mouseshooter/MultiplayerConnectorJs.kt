@@ -90,6 +90,7 @@ class JsMultiplayerConnector : MultiplayerConnector() {
                             armorRarity = (p.armorRarity as? Number)?.toInt(),
                             isReloading = p.isReloading as? Boolean ?: false,
                             reloadTimer = (p.reloadTimer as? Number)?.toFloat() ?: 0f,
+                            spawnTimer = (p.spawnTimer as? Number)?.toFloat() ?: 0f,
                         )
                     }
                     val projectiles = (data.projectiles as? Array<dynamic>)?.map { proj ->
@@ -163,6 +164,16 @@ class JsMultiplayerConnector : MultiplayerConnector() {
                         )
                     } ?: emptyList()
 
+                    val lootCrates = (data.lootCrates as? Array<dynamic>)?.map { c ->
+                        LootCrateSyncData(
+                            id = (c.id as Number).toInt(),
+                            x = (c.x as Number).toFloat(),
+                            y = (c.y as Number).toFloat(),
+                            rarity = (c.rarity as Number).toInt(),
+                            hp = (c.hp as Number).toFloat()
+                        )
+                    } ?: emptyList()
+
                     val killFeed = (data.killFeed as? Array<dynamic>)?.map { it.toString() } ?: emptyList()
                     gameSyncCallback?.invoke(GameSyncData(
                         players = players,
@@ -172,6 +183,7 @@ class JsMultiplayerConnector : MultiplayerConnector() {
                         grenades = grenades,
                         groundItems = groundItems,
                         effectZones = effectZones,
+                        lootCrates = lootCrates,
                         gameTime = (data.gameTime as Number).toFloat(),
                         battleZoneRadius = (data.battleZoneRadius as Number).toFloat(),
                         isGameOver = data.isGameOver as Boolean,

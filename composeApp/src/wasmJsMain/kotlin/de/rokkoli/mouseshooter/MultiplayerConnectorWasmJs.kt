@@ -137,6 +137,7 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                             armorRarity = if (getJsAny(pObj, "armorRarity") == null) null else getJsInt(pObj, "armorRarity"),
                             isReloading = getJsBoolean(pObj, "isReloading"),
                             reloadTimer = getJsFloat(pObj, "reloadTimer"),
+                            spawnTimer = getJsFloat(pObj, "spawnTimer"),
                         ))
                     }
                     val projArr = getJsArray(dataAny, "projectiles")
@@ -228,6 +229,20 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                             color = getJsFloat(zObj, "color").toLong(),
                         ))
                     }
+                    val cratesArr = getJsArray(dataAny, "lootCrates")
+                    val cratesLen = getJsArrayLength(cratesArr)
+                    val lootCrates = mutableListOf<LootCrateSyncData>()
+                    for (i in 0 until cratesLen) {
+                        val cObj = getJsArrayItem(cratesArr, i)
+                        lootCrates.add(LootCrateSyncData(
+                            id = getJsInt(cObj, "id"),
+                            x = getJsFloat(cObj, "x"),
+                            y = getJsFloat(cObj, "y"),
+                            rarity = getJsInt(cObj, "rarity"),
+                            hp = getJsFloat(cObj, "hp"),
+                        ))
+                    }
+
                     val killFeedArr = getJsArray(dataAny, "killFeed")
                     val killFeedLen = getJsArrayLength(killFeedArr)
                     val killFeed = mutableListOf<String>()
@@ -245,6 +260,7 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                         grenades = grenades,
                         groundItems = groundItems,
                         effectZones = effectZones,
+                        lootCrates = lootCrates,
                         gameTime = getJsFloat(dataAny, "gameTime"),
                         battleZoneRadius = getJsFloat(dataAny, "battleZoneRadius"),
                         isGameOver = getJsBoolean(dataAny, "isGameOver"),
@@ -296,7 +312,7 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
     override fun sendGameStart(numPlayers: Int, seed: Int) { network.sendGameStart(numPlayers, seed) }
     override fun sendPlayerInput(playerIndex: Int, data: PlayerInputData) { network.sendPlayerInput(playerIndex, data) }
     override fun sendGameSync(data: GameSyncData) {
-        network.sendGameSync(data.players, data.projectiles, data.meleeSwings, data.explosions, data.grenades, data.groundItems, data.effectZones, data.gameTime, data.battleZoneRadius, data.isGameOver, data.winnerId, data.killFeed)
+        network.sendGameSync(data.players, data.projectiles, data.meleeSwings, data.explosions, data.grenades, data.groundItems, data.effectZones, data.lootCrates, data.gameTime, data.battleZoneRadius, data.isGameOver, data.winnerId, data.killFeed)
     }
     override fun sendGameOver(winnerId: Int) { network.sendGameOver(winnerId) }
     override fun sendShoot(playerIndex: Int) { network.sendShoot(playerIndex) }

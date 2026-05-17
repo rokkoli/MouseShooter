@@ -167,6 +167,15 @@ data class ExplosionSyncData(
     val maxRadius: Float,
 )
 
+/** Loot crate sync data. */
+data class LootCrateSyncData(
+    val id: Int,
+    val x: Float,
+    val y: Float,
+    val rarity: Int,
+    val hp: Float,
+)
+
 /** Flattened game state for network sync (host → guests). */
 data class GameSyncData(
     val players: List<PlayerSyncData>,
@@ -176,6 +185,7 @@ data class GameSyncData(
     val grenades: List<GrenadeSyncData> = emptyList(),
     val groundItems: List<GroundItemSyncData> = emptyList(),
     val effectZones: List<EffectZoneSyncData> = emptyList(),
+    val lootCrates: List<LootCrateSyncData> = emptyList(),
     val gameTime: Float = 0f,
     val battleZoneRadius: Float = 4000f,
     val isGameOver: Boolean = false,

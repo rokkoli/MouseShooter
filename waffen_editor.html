@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Waffen-Editor (Individuell pro Seltenheit)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+  h1 { text-align: center; margin-bottom: 4px; color: #fff; font-size: 26px; }
+  .subtitle { text-align: center; color: #888; margin-bottom: 20px; font-size: 13px; }
+
+  .weapon-block { margin-bottom: 28px; background: #16213e; border-radius: 10px; overflow: hidden; border: 1px solid #223; }
+  .weapon-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; cursor: pointer; user-select: none;
+    background: linear-gradient(90deg, #0f3460, #16213e);
+  }
+  .weapon-header:hover { background: linear-gradient(90deg, #1a4070, #1a2a4e); }
+  .weapon-title { font-size: 17px; font-weight: bold; }
+  .weapon-meta { font-size: 12px; color: #889; }
+  .weapon-body { padding: 0; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #0a1a30; padding: 7px 6px; text-align: center; font-size: 12px; color: #8aacdd; white-space: nowrap; }
+  th:first-child { text-align: left; padding-left: 14px; }
+  td { padding: 3px 3px; border-bottom: 1px solid #112244; text-align: center; }
+  td:first-child { text-align: left; padding-left: 14px; font-weight: bold; font-size: 13px; white-space: nowrap; }
+
+  .r-common td:first-child { color: #aaa; }
+  .r-uncommon td:first-child { color: #4488ff; }
+  .r-rare td:first-child { color: #44ff44; }
+  .r-epic td:first-child { color: #aa44ff; }
+  .r-mythic td:first-child { color: #ff4444; }
+  .r-legendary td:first-child { color: #ffdd00; }
+
+  input[type="number"] {
+    background: #0d1b33; border: 1px solid #2a2a44; color: #fff; padding: 5px 4px;
+    border-radius: 4px; width: 72px; font-size: 13px; text-align: center;
+  }
+  input:focus { outline: none; border-color: #5577ff; box-shadow: 0 0 5px #5577ff44; }
+  input.changed { border-color: #ffaa00; background: #1a1500; }
+
+  .btn-row { text-align: center; margin: 28px 0 12px 0; }
+  .btn {
+    background: linear-gradient(135deg, #5533ff, #7755ff); color: #fff; border: none;
+    padding: 12px 36px; border-radius: 8px; font-size: 15px; cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s; margin: 0 6px;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px #5533ff55; }
+  .btn-green { background: linear-gradient(135deg, #228833, #33aa55); }
+  .btn-green:hover { box-shadow: 0 6px 20px #22883355; }
+
+  #output {
+    background: #0d1b33; border: 1px solid #334; border-radius: 8px; padding: 16px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 11.5px;
+    white-space: pre-wrap; overflow-x: auto; max-height: 600px; overflow-y: auto;
+    display: none; margin-top: 16px; line-height: 1.6;
+  }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 6px; }
+  .tag-melee { background: #553300; color: #ffaa44; }
+  .tag-hitscan { background: #003355; color: #44aaff; }
+  .tag-ammo { background: #222244; color: #aabbdd; }
+</style>
+</head>
+<body>
+
+<h1>⚔️ Waffen-Editor (Individuelle Seltenheiten)</h1>
+<p class="subtitle">Jede Waffe hat eigene Werte pro Seltenheit. Ändere alles frei und klicke "Code generieren".</p>
+
+<div id="weapons-container"></div>
+
+<div class="btn-row">
+  <button class="btn btn-green" onclick="generateCode()">📋 Code generieren</button>
+  <button class="btn" onclick="copyCode()">📑 Code kopieren</button>
+</div>
+
+<pre id="output"></pre>
+
+<script>
+const RARITIES = [
+  { id: "COMMON", label: "Häufig", cls: "r-common", dm: 1.0, frm: 1.0, rm: 1.0 },
+  { id: "UNCOMMON", label: "Ungewöhnlich", cls: "r-uncommon", dm: 1.15, frm: 1.05, rm: 0.95 },
+  { id: "RARE", label: "Selten", cls: "r-rare", dm: 1.30, frm: 1.15, rm: 0.85 },
+  { id: "EPIC", label: "Episch", cls: "r-epic", dm: 1.50, frm: 1.30, rm: 0.70 },
+  { id: "MYTHIC", label: "Mythisch", cls: "r-mythic", dm: 1.75, frm: 1.45, rm: 0.60 },
+  { id: "LEGENDARY", label: "Legendär", cls: "r-legendary", dm: 2.0, frm: 1.60, rm: 0.50 },
+];
+
+const weapons = [
+  { id: "FISTS", label: "Fäuste", melee: true, damage: 2, fireRate: 2, range: 80, knockback: 180, ammo: null, clip: 0, reload: 0, bulletSpeed: 0, bulletRadius: 0 },
+  { id: "KNIFE", label: "Messer", melee: true, damage: 8, fireRate: 4, range: 70, knockback: 70, ammo: null, clip: 0, reload: 0, bulletSpeed: 0, bulletRadius: 0 },
+  { id: "LONG_KNIFE", label: "Langmesser", melee: true, damage: 12, fireRate: 2.5, range: 100, knockback: 90, ammo: null, clip: 0, reload: 0, bulletSpeed: 0, bulletRadius: 0 },
+  { id: "BOXING_GLOVES", label: "Boxhandschuhe", melee: true, damage: 3, fireRate: 5, range: 75, knockback: 380, ammo: null, clip: 0, reload: 0, bulletSpeed: 0, bulletRadius: 0 },
+  { id: "PISTOL", label: "Pistole", melee: false, damage: 10, fireRate: 2, range: 800, knockback: 0, ammo: "LIGHT", clip: 12, reload: 1.5, bulletSpeed: 800, bulletRadius: 2.5 },
+  { id: "DUAL_PISTOL", label: "Doppelpistolen", melee: false, damage: 10, fireRate: 4, range: 800, knockback: 0, ammo: "LIGHT", clip: 24, reload: 2.0, bulletSpeed: 800, bulletRadius: 2.5 },
+  { id: "SMG", label: "Maschinengewehr", melee: false, damage: 7, fireRate: 8, range: 700, knockback: 0, ammo: "LIGHT", clip: 30, reload: 2.0, bulletSpeed: 900, bulletRadius: 2 },
+  { id: "SHOTGUN", label: "Schrotflinte", melee: false, damage: 11, fireRate: 1, range: 450, knockback: 0, ammo: "SHELLS", clip: 1, reload: 2.5, bulletSpeed: 850, bulletRadius: 2, note: "×8 Kugeln" },
+  { id: "FLAMETHROWER", label: "Flammenwerfer", melee: false, damage: 3, fireRate: 30, range: 250, knockback: 0, ammo: "OIL", clip: 100, reload: 3.0, bulletSpeed: 300, bulletRadius: 3, note: "×5 Part." },
+  { id: "ROCKET_LAUNCHER", label: "Raketenwerfer", melee: false, damage: 35, fireRate: 0.5, range: 900, knockback: 0, ammo: "ROCKETS", clip: 1, reload: 3.5, bulletSpeed: 350, bulletRadius: 8, note: "Explosiv" },
+  { id: "MINIGUN", label: "Minigun", melee: false, damage: 5, fireRate: 14, range: 750, knockback: 0, ammo: "LIGHT", clip: 100, reload: 5.0, bulletSpeed: 1100, bulletRadius: 2 },
+  { id: "SNIPER", label: "Sniper", melee: false, damage: 50, fireRate: 0.1, range: 10000, knockback: 0, ammo: "HEAVY", clip: 5, reload: 4.0, bulletSpeed: 4000, bulletRadius: 2 },
+  { id: "DUAL_ENERGY_PISTOL", label: "Energiepistolen", melee: false, damage: 1.15, fireRate: 28, range: 800, knockback: 0, ammo: "ENERGY", clip: 60, reload: 2.0, bulletSpeed: 1000, bulletRadius: 2 },
+  { id: "ENERGY_RIFLE", label: "Energiegewehr", melee: false, damage: 12, fireRate: 1, range: 300, knockback: 50, ammo: "ENERGY", clip: 5, reload: 3.0, bulletSpeed: 0, bulletRadius: 3, note: "Hitscan, 3s Stun" },
+  { id: "LASER_BEAM", label: "Laserstrahl", melee: false, damage: 15, fireRate: 1, range: 2000, knockback: 0, ammo: "ENERGY", clip: 5, reload: 3.0, bulletSpeed: 0, bulletRadius: 3, note: "Hitscan, 2× Bounce" },
+  { id: "CHAINSAW", label: "Kettensäge", melee: true, damage: 10, fireRate: 2, range: 70, knockback: 50, ammo: "OIL", clip: 0, reload: 0, bulletSpeed: 0, bulletRadius: 0 },
+  { id: "LASER_SWORD", label: "Laserschwert", melee: true, damage: 15, fireRate: 2.5, range: 120, knockback: 80, ammo: "ENERGY", clip: 0, reload: 0, bulletSpeed: 0, bulletRadius: 0 },
+  { id: "KATANA", label: "Katana", melee: true, damage: 7, fireRate: 2.5, range: 80, knockback: 60, ammo: null, clip: 0, reload: 0, bulletSpeed: 0, bulletRadius: 0, note: "Reflektiert" },
+];
+
+function r(val, decimals=1) { return Math.round(val * Math.pow(10, decimals)) / Math.pow(10, decimals); }
+
+function buildAll() {
+  const container = document.getElementById('weapons-container');
+  container.innerHTML = '';
+
+  for (const w of weapons) {
+    const isMelee = w.melee;
+    const tags = [];
+    if (isMelee) tags.push('<span class="tag tag-melee">Nahkampf</span>');
+    if (w.note && w.note.includes('Hitscan')) tags.push('<span class="tag tag-hitscan">Hitscan</span>');
+    if (w.ammo) tags.push(`<span class="tag tag-ammo">${w.ammo}</span>`);
+
+    let cols = isMelee
+      ? '<th>Seltenheit</th><th>Schaden</th><th>Schläge/s</th><th>Reichweite</th><th>Knockback</th>'
+      : '<th>Seltenheit</th><th>Schaden</th><th>Feuerrate</th><th>Reichweite</th><th>Magazin</th><th>Nachladezeit</th>';
+
+    let rows = '';
+    for (const rar of RARITIES) {
+      const dmg = r(w.damage * rar.dm, 2);
+      const fr = r(w.fireRate * rar.frm, 2);
+      const rl = w.reload > 0 ? r(w.reload * rar.rm, 2) : 0;
+
+      if (isMelee) {
+        rows += `<tr class="${rar.cls}" data-weapon="${w.id}" data-rarity="${rar.id}">
+          <td>${rar.label}</td>
+          <td><input type="number" value="${dmg}" step="0.5" data-key="damage"></td>
+          <td><input type="number" value="${fr}" step="0.25" data-key="fireRate"></td>
+          <td><input type="number" value="${w.range}" step="5" data-key="range"></td>
+          <td><input type="number" value="${w.knockback}" step="10" data-key="knockback"></td>
+        </tr>`;
+      } else {
+        rows += `<tr class="${rar.cls}" data-weapon="${w.id}" data-rarity="${rar.id}">
+          <td>${rar.label}</td>
+          <td><input type="number" value="${dmg}" step="0.5" data-key="damage"></td>
+          <td><input type="number" value="${fr}" step="0.25" data-key="fireRate"></td>
+          <td><input type="number" value="${w.range}" step="25" data-key="range"></td>
+          <td><input type="number" value="${w.clip}" step="1" data-key="clip"></td>
+          <td><input type="number" value="${rl}" step="0.1" data-key="reload"></td>
+        </tr>`;
+      }
+    }
+
+    container.innerHTML += `
+      <div class="weapon-block">
+        <div class="weapon-header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? '' : 'none'">
+          <span class="weapon-title">${w.label} ${tags.join('')} ${w.note ? '<span class="weapon-meta">(' + w.note + ')</span>' : ''}</span>
+          <span class="weapon-meta">▼</span>
+        </div>
+        <div class="weapon-body">
+          <table><thead><tr>${cols}</tr></thead><tbody>${rows}</tbody></table>
+        </div>
+      </div>`;
+  }
+}
+
+function generateCode() {
+  const out = document.getElementById('output');
+  out.style.display = 'block';
+
+  let lines = [];
+  lines.push('// ══════ Sag mir diese Werte, dann übernehme ich sie ══════');
+  lines.push('');
+
+  for (const w of weapons) {
+    lines.push(`── ${w.label} (${w.id}) ──`);
+    for (const rar of RARITIES) {
+      const row = document.querySelector(`tr[data-weapon="${w.id}"][data-rarity="${rar.id}"]`);
+      if (!row) continue;
+      const vals = {};
+      row.querySelectorAll('input').forEach(inp => { vals[inp.dataset.key] = parseFloat(inp.value); });
+
+      if (w.melee) {
+        lines.push(`  ${rar.label.padEnd(14)} → Schaden: ${vals.damage}, Schläge/s: ${vals.fireRate}, Reichweite: ${vals.range}, KB: ${vals.knockback}`);
+      } else {
+        lines.push(`  ${rar.label.padEnd(14)} → Schaden: ${vals.damage}, Feuerrate: ${vals.fireRate}, Reichw.: ${vals.range}, Magazin: ${vals.clip}, Nachladen: ${vals.reload}s`);
+      }
+    }
+    lines.push('');
+  }
+
+  out.textContent = lines.join('\n');
+  out.scrollIntoView({ behavior: 'smooth' });
+}
+
+function copyCode() {
+  const out = document.getElementById('output');
+  if (out.style.display === 'none') generateCode();
+  navigator.clipboard.writeText(out.textContent);
+  alert('In Zwischenablage kopiert!');
+}
+
+buildAll();
+</script>
+</body>
+</html>

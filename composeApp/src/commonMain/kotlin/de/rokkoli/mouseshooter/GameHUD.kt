@@ -25,6 +25,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import androidx.compose.runtime.LaunchedEffect
 
 // ─── HUD-Farben ───────────────────────────────────────────────────────────────
 private val HudBackground = Color(0xCC000000)
@@ -144,14 +153,13 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
     }
 
     val clipAmmo = inv.clipAmmo
-    val reserveAmmo = inv.reserveAmmo
 
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        // Index: 0=Melee, 1-3=Guns, 4-5=Grenades, 6=Rüstung
+        // Waffen-Slots
         allSlots.forEachIndexed { index, (label, color, rarityColor) ->
             val isActive = index == inv.selectedSlotIndex
             val itemColor = color?.let { Color(it) } ?: Color.Transparent
@@ -165,6 +173,30 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
                     fontSize = 10.sp,
                     modifier = Modifier.padding(bottom = 2.dp)
                 )
+
+                // Nachladebalken (nur beim aktiven Slot während des Nachladens)
+                if (isActive && player.isReloading && index in 1..3) {
+                    val gun = inv.gunSlots.getOrNull(index - 1)
+                    if (gun != null) {
+                        val rarity = inv.gunRarities.getOrNull(index - 1) ?: Rarity.COMMON
+                        val totalReload = gun.reloadTime * rarity.reloadMod
+                        val progress = if (totalReload > 0f) 1f - (player.reloadTimer / totalReload) else 1f
+                        Box(
+                            modifier = Modifier
+                                .width(58.dp)
+                                .height(3.dp)
+                                .background(Color(0xFF333344), RoundedCornerShape(2.dp))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                                    .background(Color.White, RoundedCornerShape(2.dp))
+                            )
+                        }
+                        Spacer(Modifier.height(2.dp))
+                    }
+                }
 
                 Box(
                     modifier = Modifier
@@ -196,14 +228,17 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
                                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
                             )
                             
-                            // Munitions-Anzeige für Schusswaffen
+                            // Munitions-Anzeige: Magazin / Magazingröße
                             if (index in 1..3) {
                                 val gun = inv.gunSlots[index - 1]
                                 if (gun != null) {
                                     val current = clipAmmo.getOrNull(index - 1) ?: 0
-                                    val total = reserveAmmo[gun.ammoType] ?: 0
+                                    val rarity = inv.gunRarities.getOrNull(index - 1) ?: Rarity.COMMON
+                                    val maxClip = if (gun == WeaponType.SHOTGUN) {
+                                        if (rarity.ordinal >= Rarity.EPIC.ordinal) 2 else 1
+                                    } else gun.clipSize
                                     Text(
-                                        text = "$current / $total",
+                                        text = "$current / $maxClip",
                                         color = if (current == 0) Color.Red else Color.White.copy(alpha = 0.8f),
                                         fontSize = 7.sp,
                                         fontWeight = FontWeight.Bold
@@ -227,8 +262,53 @@ fun InventoryBar(player: Player, onArmorClick: () -> Unit, modifier: Modifier) {
                 Text(catLabel, color = Color(0xFF666677), fontSize = 8.sp)
             }
         }
+
+        Spacer(Modifier.width(8.dp))
+
+        // ── Reserve-Munitionsanzeige ──────────────────────────────────────
+        ReserveAmmoPanel(inv)
     }
 }
+
+@Composable
+private fun ReserveAmmoPanel(inv: Inventory) {
+    Column(
+        modifier = Modifier
+            .background(HudBackground, RoundedCornerShape(8.dp))
+            .border(1.dp, HudBorder, RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text("MUNITION", color = Color.White.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
+        
+        AmmoType.entries.forEach { ammoType ->
+            val amount = inv.reserveAmmo[ammoType] ?: 0
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(Color(ammoType.color), CircleShape)
+                )
+                Text(
+                    text = ammoType.label,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 8.sp,
+                    modifier = Modifier.width(65.dp)
+                )
+                Text(
+                    text = "$amount",
+                    color = if (amount == 0) Color.White.copy(alpha = 0.5f) else Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun HpBar(player: Player, modifier: Modifier) {
@@ -414,14 +494,50 @@ fun GameOverScreen(state: GameState, onRestart: () -> Unit) {
 
 // ─── Hauptmenü ────────────────────────────────────────────────────────────────
 @Composable
-fun MainMenu(onStartSingleplayer: () -> Unit, onStartMultiplayer: () -> Unit) {
+fun MainMenu(onStartSingleplayer: () -> Unit, onStartMultiplayer: () -> Unit, onStartTestMap: () -> Unit = {}) {
+    var inTestMapMenu by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(inTestMapMenu) {
+        if (inTestMapMenu) focusRequester.requestFocus()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A1020)),
+            .background(Color(0xFF0A1020))
+            .focusRequester(focusRequester)
+            .focusable()
+            .onKeyEvent {
+                if (inTestMapMenu && it.key == Key.Q && it.type == KeyEventType.KeyDown) {
+                    onStartTestMap()
+                    true
+                } else false
+            },
         contentAlignment = Alignment.Center
     ) {
-        // Hintergrund-Dekor
+        // Test Map Button (Top Right)
+        Button(
+            onClick = { inTestMapMenu = true },
+            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222233))
+        ) {
+            Text("Test Map", color = Color.Gray, fontSize = 12.sp)
+        }
+
+        if (inTestMapMenu) {
+            // Overlay
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.8f)), contentAlignment=Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("TEST MAP MENU", color=Color.White, fontSize=24.sp, fontWeight=FontWeight.Bold)
+                    Spacer(Modifier.height(20.dp))
+                    Button(onClick = { inTestMapMenu = false }, colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) {
+                        Text("Zurück")
+                    }
+                }
+            }
+        } else {
+            // Hintergrund-Dekor
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 "MOUSE SHOOTER",
@@ -489,6 +605,7 @@ fun MainMenu(onStartSingleplayer: () -> Unit, onStartMultiplayer: () -> Unit) {
                     Text("MULTIPLAYER", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
                 }
             }
+        }
         }
     }
 }

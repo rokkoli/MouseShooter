@@ -188,12 +188,13 @@ class NetworkManager {
             pObj.armorSlot = p.armorSlot
             pObj.clipAmmo = p.clipAmmo.toTypedArray()
             pObj.reserveAmmo = mapToJsObject(p.reserveAmmo)
-            pObj.meleeRarity = p.meleeRarity.ordinal
-            pObj.gunRarities = p.gunRarities.map { it.ordinal }.toTypedArray()
-            pObj.grenadeRarities = p.grenadeRarities.map { it.ordinal }.toTypedArray()
-            pObj.armorRarity = p.armorRarity?.ordinal
+            pObj.meleeRarity = p.meleeRarity
+            pObj.gunRarities = p.gunRarities.toTypedArray()
+            pObj.grenadeRarities = p.grenadeRarities.toTypedArray()
+            pObj.armorRarity = p.armorRarity
             pObj.isReloading = p.isReloading
             pObj.reloadTimer = p.reloadTimer
+            pObj.spawnTimer = p.spawnTimer
             pObj
         }.toTypedArray()
         msg.projectiles = data.projectiles.map { proj ->
@@ -253,6 +254,15 @@ class NetworkManager {
             iObj.itemType = gi.itemType
             iObj.rarity = gi.rarity
             iObj
+        }.toTypedArray()
+        msg.lootCrates = data.lootCrates.map { c ->
+            val cObj = js("{}")
+            cObj.id = c.id
+            cObj.x = c.x
+            cObj.y = c.y
+            cObj.rarity = c.rarity
+            cObj.hp = c.hp
+            cObj
         }.toTypedArray()
         msg.effectZones = data.effectZones.map { ez ->
             val zObj = js("{}")

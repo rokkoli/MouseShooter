@@ -28,6 +28,7 @@ import kotlin.math.atan2
 sealed class Screen {
     data object Menu : Screen()
     data object Singleplayer : Screen()
+    data object TestMap : Screen()
     data object MultiplayerLobbyScreen : Screen()
     data class MultiplayerGameScr(
         val connector: MultiplayerConnector,
@@ -43,11 +44,17 @@ fun App() {
     when (val s = screen) {
         is Screen.Menu -> MainMenu(
             onStartSingleplayer = { screen = Screen.Singleplayer },
-            onStartMultiplayer = { screen = Screen.MultiplayerLobbyScreen }
+            onStartMultiplayer = { screen = Screen.MultiplayerLobbyScreen },
+            onStartTestMap = { screen = Screen.TestMap }
         )
         is Screen.Singleplayer -> GameScreen(
             mode = GameMode.SINGLEPLAYER,
             onRestart = { screen = Screen.Menu }
+        )
+        is Screen.TestMap -> GameScreen(
+            mode = GameMode.SINGLEPLAYER,
+            onRestart = { screen = Screen.Menu },
+            initialState = createTestMapState()
         )
         is Screen.MultiplayerLobbyScreen -> MultiplayerLobby(
             onBack = { screen = Screen.Menu },
@@ -68,8 +75,8 @@ enum class GameMode { SINGLEPLAYER, MULTIPLAYER }
 // ─── Spielbildschirm ──────────────────────────────────────────────────────────
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun GameScreen(mode: GameMode, onRestart: () -> Unit) {
-    var gameState   by remember { mutableStateOf(createInitialState()) }
+fun GameScreen(mode: GameMode, onRestart: () -> Unit, initialState: GameState? = null) {
+    var gameState   by remember { mutableStateOf(initialState ?: createInitialState()) }
     var mousePos    by remember { mutableStateOf(Vec2(400f, 300f)) }
     var isRightDown by remember { mutableStateOf(false) }
     var isLeftDown  by remember { mutableStateOf(false) }
@@ -101,10 +108,10 @@ fun GameScreen(mode: GameMode, onRestart: () -> Unit) {
                     })
                 }
 
-                // Schießen (Semi-Auto außer bei SMG/Flammenwerfer/Minigun)
+                // Schießen (Semi-Auto außer bei SMG/Flammenwerfer/Minigun/etc)
                 if (isLeftDown) {
                     val w = localPlayer?.inventory?.activeWeapon
-                    val isAuto = w == WeaponType.SMG || w == WeaponType.FLAMETHROWER || w == WeaponType.MINIGUN
+                    val isAuto = w == WeaponType.SMG || w == WeaponType.FLAMETHROWER || w == WeaponType.MINIGUN || w == WeaponType.DUAL_ENERGY_PISTOL || w == WeaponType.CHAINSAW
                     if (isAuto || !wasLeftDown) {
                         val localId = localPlayer?.id ?: -1
                         if (localId >= 0) {

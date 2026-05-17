@@ -7,7 +7,8 @@ enum class AmmoType(val label: String, val color: Long) {
     HEAVY("Schwer", 0xFF888844),
     SHELLS("Schrot", 0xFF884444),
     ROCKETS("Raketen", 0xFFCC8844),
-    FUEL("Brennstoff", 0xFFFF6600)
+    OIL("Öl", 0xFFFF6600),
+    ENERGY("Energiemunition", 0xFF00AAFF)
 }
 
 // ─── Waffentypen ────────────────────────────────────────────────────────────
@@ -32,10 +33,17 @@ enum class WeaponType(
     PISTOL("Pistole",        10f, 2f,  800f, 2.5f, 800f, 0xFFFFDD00, false, 0f, AmmoType.LIGHT, 12, 1.5f),
     SMG("Maschinengewehr",    7f, 8f,  900f, 2f, 700f, 0xFF00AAFF, false, 0f, AmmoType.LIGHT, 30, 2.0f),
     SHOTGUN("Schrotflinte",  11f, 1f,  850f, 2f, 450f, 0xFF884444, false, 0f, AmmoType.SHELLS, 1, 2.5f),
-    FLAMETHROWER("Flammenwerfer", 3f, 30f, 300f, 3f, 250f, 0xFFFF4400, false, 0f, AmmoType.FUEL, 100, 3.0f),
+    FLAMETHROWER("Flammenwerfer", 3f, 30f, 300f, 3f, 250f, 0xFFFF4400, false, 0f, AmmoType.OIL, 100, 3.0f),
     ROCKET_LAUNCHER("Raketenwerfer", 35f, 0.5f, 350f, 8f, 900f, 0xFFFF8800, false, 0f, AmmoType.ROCKETS, 1, 3.5f),
     MINIGUN("Minigun", 5f, 14f, 1100f, 2f, 750f, 0xFF4455FF, false, 0f, AmmoType.LIGHT, 100, 5.0f),
-    SNIPER("Sniper", 50f, 0.1f, 4000f, 2f, 10000f, 0xFFFF0033, false, 0f, AmmoType.HEAVY, 5, 4.0f);
+    SNIPER("Sniper", 50f, 0.1f, 4000f, 2f, 10000f, 0xFFFF0033, false, 0f, AmmoType.HEAVY, 5, 4.0f),
+    DUAL_ENERGY_PISTOL("Energiepistolen", 1.15f, 28f, 1000f, 2f, 800f, 0xFFAAAAFF, false, 0f, AmmoType.ENERGY, 60, 2.0f),
+    ENERGY_RIFLE("Energiegewehr", 12f, 1f, 0f, 3f, 300f, 0xFF44AAFF, false, 50f, AmmoType.ENERGY, 5, 3.0f),
+    DUAL_PISTOL("Doppelpistolen", 10f, 4f, 800f, 2.5f, 800f, 0xFFFFDD00, false, 0f, AmmoType.LIGHT, 24, 2.0f),
+    LASER_BEAM("Laserstrahl", 15f, 1f, 0f, 3f, 2000f, 0xFF00FFFF, false, 0f, AmmoType.ENERGY, 5, 3.0f),
+    CHAINSAW("Kettensäge", 10f, 2f, 0f, 0f, 70f, 0xFFBBBBBB, true, 50f, AmmoType.OIL),
+    LASER_SWORD("Laserschwert", 15f, 2.5f, 0f, 0f, 120f, 0xFF00FF00, true, 80f, AmmoType.ENERGY),
+    KATANA("Katana", 7f, 2.5f, 0f, 0f, 80f, 0xFFDDDDDD, true, 60f);
 }
 
 enum class GrenadeType(val label: String, val color: Long) {
@@ -60,6 +68,7 @@ enum class Rarity(val glowColor: Long, val label: String, val damageMod: Float, 
     UNCOMMON(0xFF4488FF, "Ungewöhnlich", 1.15f, 1.05f, 0.95f),
     RARE(0xFF44FF44, "Selten", 1.30f, 1.15f, 0.85f),
     EPIC(0xFFAA44FF, "Episch", 1.50f, 1.30f, 0.70f),
+    MYTHIC(0xFFFF2222, "Mythisch", 1.75f, 1.45f, 0.60f),
     LEGENDARY(0xFFFFFF00, "Legendär", 2.0f, 1.60f, 0.50f);
 }
 
@@ -69,8 +78,9 @@ fun rarityFromDistance(dist: Float, maxDist: Float, random: kotlin.random.Random
     return when {
         r < 0.45f -> Rarity.COMMON
         r < 0.70f -> Rarity.UNCOMMON
-        r < 0.88f -> Rarity.RARE
-        r < 0.96f -> Rarity.EPIC
+        r < 0.86f -> Rarity.RARE
+        r < 0.94f -> Rarity.EPIC
+        r < 0.98f -> Rarity.MYTHIC
         else      -> Rarity.LEGENDARY
     }
 }
@@ -170,20 +180,21 @@ data class StatusEffects(
 data class Inventory(
     val meleeSlot: WeaponType? = WeaponType.FISTS,
     val meleeRarity: Rarity = Rarity.COMMON,
-    val gunSlots: List<WeaponType?> = listOf(WeaponType.PISTOL, null, null),
+    val gunSlots: List<WeaponType?> = listOf(null, null, null),
     val gunRarities: List<Rarity> = listOf(Rarity.COMMON, Rarity.COMMON, Rarity.COMMON),
     val grenadeSlots: List<GrenadeType?> = listOf(null, null),
     val grenadeRarities: List<Rarity> = listOf(Rarity.COMMON, Rarity.COMMON),
     val armorSlot: ArmorType? = null,
     val armorRarity: Rarity? = null,
-    val selectedSlotIndex: Int = 1,  // 0=melee, 1-3=guns, 4-5=grenades, 6=armor
-    val clipAmmo: List<Int> = listOf(12, 0, 0), // Ammo in Magazin für gunSlots
+    val selectedSlotIndex: Int = 0,  // 0=melee, 1-3=guns, 4-5=grenades, 6=armor
+    val clipAmmo: List<Int> = listOf(0, 0, 0), // Ammo in Magazin für gunSlots
     val reserveAmmo: Map<AmmoType, Int> = mapOf(
-        AmmoType.LIGHT to 60,
-        AmmoType.HEAVY to 10,
-        AmmoType.SHELLS to 16,
-        AmmoType.ROCKETS to 2,
-        AmmoType.FUEL to 100
+        AmmoType.LIGHT to 0,
+        AmmoType.HEAVY to 0,
+        AmmoType.SHELLS to 0,
+        AmmoType.ROCKETS to 0,
+        AmmoType.OIL to 0,
+        AmmoType.ENERGY to 0
     )
 ) {
     val activeWeapon: WeaponType? get() = when {
@@ -228,42 +239,32 @@ data class Inventory(
         return this
     }
 
-    fun addWeapon(w: WeaponType, r: Rarity): Inventory {
+    fun addWeapon(w: WeaponType, r: Rarity, swapIdx: Int? = null): Inventory {
         if (w.isMelee) return copy(meleeSlot = w, meleeRarity = r)
         val newGuns = gunSlots.toMutableList()
         val newRarities = gunRarities.toMutableList()
         val newClip = clipAmmo.toMutableList()
-        val freeIdx = newGuns.indexOfFirst { it == null }
-        if (freeIdx >= 0) {
-            newGuns[freeIdx] = w
-            newRarities[freeIdx] = r
-            // Spezielle Logik für Schrotflinte: Häufig/Selten = 1 Schuss, Episch/Legendär = 2 Schuss
-            val clipSize = if (w == WeaponType.SHOTGUN) {
-                if (r.ordinal >= Rarity.EPIC.ordinal) 2 else 1
-            } else w.clipSize
-            newClip[freeIdx] = clipSize
-        } else {
-            newGuns[0] = w
-            newRarities[0] = r
-            val clipSize = if (w == WeaponType.SHOTGUN) {
-                if (r.ordinal >= Rarity.EPIC.ordinal) 2 else 1
-            } else w.clipSize
-            newClip[0] = clipSize
-        }
+        
+        val targetIdx = swapIdx ?: newGuns.indexOfFirst { it == null }.let { if (it >= 0) it else 0 }
+        
+        newGuns[targetIdx] = w
+        newRarities[targetIdx] = r
+        val clipSize = if (w == WeaponType.SHOTGUN) {
+            if (r.ordinal >= Rarity.EPIC.ordinal) 2 else 1
+        } else w.clipSize
+        newClip[targetIdx] = clipSize
+        
         return copy(gunSlots = newGuns, gunRarities = newRarities, clipAmmo = newClip)
     }
 
-    fun addGrenade(g: GrenadeType, r: Rarity): Inventory {
+    fun addGrenade(g: GrenadeType, r: Rarity, swapIdx: Int? = null): Inventory {
         val newGrenades = grenadeSlots.toMutableList()
         val newRarities = grenadeRarities.toMutableList()
-        val freeIdx = newGrenades.indexOfFirst { it == null }
-        if (freeIdx >= 0) {
-            newGrenades[freeIdx] = g
-            newRarities[freeIdx] = r
-        } else {
-            newGrenades[0] = g
-            newRarities[0] = r
-        }
+        
+        val targetIdx = swapIdx ?: newGrenades.indexOfFirst { it == null }.let { if (it >= 0) it else 0 }
+        
+        newGrenades[targetIdx] = g
+        newRarities[targetIdx] = r
         return copy(grenadeSlots = newGrenades, grenadeRarities = newRarities)
     }
 
@@ -282,6 +283,8 @@ data class Player(
     val fireCooldown: Float = 0f,
     val isLocalPlayer: Boolean = false,
     val isBot: Boolean = false,
+    val isDummyBot: Boolean = false,
+    val isShootingDummy: Boolean = false,
     val statusEffects: StatusEffects = StatusEffects(),
     val isAlive: Boolean = true,
     val color: Long = 0xFF00AAFF,
@@ -296,9 +299,11 @@ data class Player(
     val hasDroppedLoot: Boolean = false,
     val lastDamagedBy: Int = -1,
     val lastMeleeLeft: Boolean = false,
+    val lastShotLeft: Boolean = false,
     val isMovingIntent: Boolean = false, // Neu für Multiplayer-Bewegung
     val isReloading: Boolean = false,
-    val reloadTimer: Float = 0f
+    val reloadTimer: Float = 0f,
+    val energyConsumeTimer: Float = 0f
 )
 
 // ─── Projektile ──────────────────────────────────────────────────────────────
@@ -313,7 +318,9 @@ data class Projectile(
     val lifeTime: Float,
     val maxLifeTime: Float,
     val isExplosive: Boolean = false,
-    val explosionRadius: Float = 0f
+    val explosionRadius: Float = 0f,
+    val bouncesRemaining: Int = 0,
+    val stunDuration: Float = 0f
 )
 
 // ─── Explosionen ─────────────────────────────────────────────────────────────
@@ -382,18 +389,51 @@ data class MeleeSwing(
     val damage: Float,
     val knockback: Float,
     var timer: Float = 0.15f,
+    val maxTimer: Float = 0.15f,
     val hitPlayerIds: Set<Int> = emptySet()
+)
+
+// ─── Loot-Kisten ─────────────────────────────────────────────────────────────
+data class LootCrate(
+    val id: Int,
+    val pos: Vec2,
+    val rarity: Rarity,
+    val hp: Float = 30f,
+    val maxHp: Float = 30f,
+    val width: Float = 40f,
+    val height: Float = 22f,
+) {
+    fun contains(p: Vec2): Boolean =
+        p.x >= pos.x - width / 2 && p.x <= pos.x + width / 2 &&
+        p.y >= pos.y - height / 2 && p.y <= pos.y + height / 2
+
+    fun intersectsCircle(center: Vec2, radius: Float): Boolean {
+        val cx = center.x.coerceIn(pos.x - width / 2, pos.x + width / 2)
+        val cy = center.y.coerceIn(pos.y - height / 2, pos.y + height / 2)
+        return center.distanceTo(Vec2(cx, cy)) < radius
+    }
+}
+
+// ─── Hitscan Beams ────────────────────────────────────────────────────────────
+data class HitscanBeam(
+    val path: List<Vec2>,
+    var timer: Float = 0.15f,
+    val maxTimer: Float = 0.15f,
+    val color: Long,
+    val thickness: Float = 3f
 )
 
 // ─── Hauptspielzustand ────────────────────────────────────────────────────────
 data class GameState(
     val players: List<Player> = emptyList(),
     val projectiles: List<Projectile> = emptyList(),
+    val hitscanBeams: List<HitscanBeam> = emptyList(),
     val explosions: List<Explosion> = emptyList(),
     val grenades: List<ThrownGrenade> = emptyList(),
     val effectZones: List<EffectZone> = emptyList(),
     val groundItems: List<GroundItem> = emptyList(),
     val obstacles: List<Obstacle> = emptyList(),
+    val lootCrates: List<LootCrate> = emptyList(),
     val battleZone: BattleZone = BattleZone(2000f, 200f, 200f, 0f, 0f),
     val meleeSwings: List<MeleeSwing> = emptyList(),
     val mapWidth: Float = 5500f,
