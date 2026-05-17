@@ -93,7 +93,7 @@ class WasmJsMultiplayerConnector : MultiplayerConnector() {
                         if (reserveAmmoObj != null) {
                             val keysArr = getJsKeys(reserveAmmoObj)
                             for (j in 0 until getJsArrayLength(keysArr)) {
-                                val key = getJsArrayItem(keysArr, j).toString()
+                                val key = getJsStringAt(keysArr, j) ?: ""
                                 reserveAmmo[key] = getJsInt(reserveAmmoObj, key)
                             }
                         }

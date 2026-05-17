@@ -187,8 +187,9 @@ fun MultiplayerGameScreen(
                             if (p.id == 0 || !p.isAlive) return@map p
                             if (!p.isMovingIntent) return@map p.copy(velocity = Vec2(0f, 0f))
 
+                            val speedMod = if (p.isSpawning) 0.5f else 1f
                             val dir = Vec2(kotlin.math.cos(p.rotation), kotlin.math.sin(p.rotation))
-                            val vel = dir * PLAYER_SPEED
+                            val vel = dir * PLAYER_SPEED * speedMod
                             var newPos = p.pos + vel * dt
                             newPos = GameEngine.resolveObstacleCollision(newPos, current.obstacles, PLAYER_RADIUS)
                             newPos = newPos.clampToMap(current.mapWidth, current.mapHeight)
